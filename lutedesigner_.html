@@ -86,7 +86,20 @@ input[type=number]{
 	
 	<label><button id="uploadbutton" onclick="uploaddrawing(this);">Export drawing to server</button></label>
 	<label><button id="downloadbutton" onclick="downloaddrawing();">Download SVG drawing</button></label>
+	<label><button id="exportpartsbutton" onclick="openexportdialog();">Export parts&hellip;</button></label>
 	<label><button id="hidehandles" onclick="hidehandles(this);">Show handles</button></label>
+
+<div id="export-dialog" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%);
+     background:#fff; border:1px solid #888; padding:16px; z-index:1000; min-width:260px; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+  <h3 style="margin:0 0 10px">Export parts as SVG</h3>
+  <label><input type="checkbox" class="export-part-cb" value="flatribs-layer"> Flat rib templates</label><br>
+  <label><input type="checkbox" class="export-part-cb" value="foamformplanlayer"> Foam form plan</label><br>
+  <label><input type="checkbox" class="export-part-cb" value="carvedformplanlayer"> Carved form plan</label><br>
+  <label><input type="checkbox" class="export-part-cb" value="formlayer"> Manufacturing form</label><br>
+  <br>
+  <button onclick="downloadselectedparts();">Download selected</button>
+  <button onclick="closeexportdialog();" style="margin-left:8px">Cancel</button>
+</div>
 	<label title="Select instrument, all values in the editor will be overwritten.">Instrument Preset
 	<select id="instrumentpreset" name="instrumentpreset" onchange="select_instrument(this)">
 		<!-- Gets filled from instrumentpresets at startup -->

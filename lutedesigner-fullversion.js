@@ -203,9 +203,15 @@ function downloaddrawing(){
     // viewBox="0 0 210 297"
 	
 	// scale is calculated automatically from viewbox size and page size.
-	drawing.setAttribute("width", "210mm");
-	drawing.setAttribute("height", "297mm");
-	drawing.setAttribute("viewBox", "0 0 210 297");
+	var bb = drawing.getBBox();
+	var pad = 5;
+	var vx = (bb.x - pad).toFixed(2);
+	var vy = (bb.y - pad).toFixed(2);
+	var vw = (bb.width  + pad * 2).toFixed(2);
+	var vh = (bb.height + pad * 2).toFixed(2);
+	drawing.setAttribute("width",   vw + "mm");
+	drawing.setAttribute("height",  vh + "mm");
+	drawing.setAttribute("viewBox", vx + " " + vy + " " + vw + " " + vh);
 	delelid("handlelayer"); // Remove handles etc
 	// Add scale & user unit information for inkscape
 	var scale = [
@@ -233,9 +239,54 @@ function downloaddrawing(){
 				stringing()+".svg";
 	// offer a download
 	var datatype = 'data:image/svg+xml;charset=utf-8,';
-	download(fname, drawing.outerHTML, datatype);	
-	
-	
+	download(fname, drawing.outerHTML, datatype);
+
+
+}
+
+function openexportdialog() {
+	getelid("export-dialog").style.display = "block";
+}
+function closeexportdialog() {
+	getelid("export-dialog").style.display = "none";
+}
+
+function exportlayerassvg(layerid) {
+	var source = getelid(layerid);
+	if (!source) { console.warn("Layer not found:", layerid); return; }
+
+	var bb = source.getBBox();
+	var pad = 5;
+	var vx = (bb.x - pad).toFixed(2);
+	var vy = (bb.y - pad).toFixed(2);
+	var vw = (bb.width  + pad * 2).toFixed(2);
+	var vh = (bb.height + pad * 2).toFixed(2);
+
+	var svgns = "http://www.w3.org/2000/svg";
+	var svgwrap = document.createElementNS(svgns, "svg");
+	svgwrap.setAttribute("xmlns", svgns);
+	svgwrap.setAttribute("xmlns:inkscape", "http://www.inkscape.org/namespaces/inkscape");
+	svgwrap.setAttribute("width",   vw + "mm");
+	svgwrap.setAttribute("height",  vh + "mm");
+	svgwrap.setAttribute("viewBox", vx + " " + vy + " " + vw + " " + vh);
+
+	var clone = source.cloneNode(true);
+	// getBBox() accounts for the group's transform, so the viewBox already frames content
+	// in SVG root coordinates. Strip the transform from the clone so it renders correctly
+	// relative to the new viewBox origin.
+	clone.removeAttribute("transform");
+	svgwrap.appendChild(clone);
+
+	var fname = editorstate.bodyshapefromlist + "_" + editorstate.mensur + "mm_" + layerid + ".svg";
+	var datatype = 'data:image/svg+xml;charset=utf-8,';
+	download(fname, svgwrap.outerHTML, datatype);
+}
+
+function downloadselectedparts() {
+	var cbs = document.querySelectorAll(".export-part-cb:checked");
+	if (cbs.length === 0) { alert("Select at least one part."); return; }
+	cbs.forEach(function(cb) { exportlayerassvg(cb.value); });
+	closeexportdialog();
 }
 
 function bodylist_totext(){
