@@ -570,7 +570,7 @@ function insert_drawing(fromsvg, id, togroup, topoint, rotate, rotpoint){
 		console.log("did not find " + id);
 		return;
 	}
-	var item = fromsvg.getElementById(id).cloneNode(true);
+	var item = document.importNode(fromsvg.getElementById(id), true);
 	
 	var t = "translate("+topoint.x+" "+topoint.y+")";
 	if (rotate) {
@@ -975,7 +975,9 @@ function copyelement(group, el, point, style){
 	// Copies the given svg element into the specified group
 	// console.log(group, el, point, style);
 	// console.log("before clone in copyelement",el);
-	var cln = el.cloneNode(true);
+	// importNode, not cloneNode: el may come from an <object> SVG document whose
+	// window lacks the pathseg.js polyfill, so a plain clone has no pathSegList
+	var cln = document.importNode(el, true);
 	// console.log("after clone in copyelement",cln);
 	// position path by replacing its M command
 	// cln.setAttribute("d",positionpath(cln.getAttribute("d"), coords));

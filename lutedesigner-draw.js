@@ -983,9 +983,9 @@ function drawpegbox(frontview,sideview,detached){
 		// Draw bass rider
 		if (editorstate.pegboxstyle=="bassrider"){
 			var theorbosvgdoc = getelid("svg-theorbos").getSVGDocument();
-			var briderfront = theorbosvgdoc.getElementById("bassrider-front").cloneNode(true);
-			var bridertop = theorbosvgdoc.getElementById("bassrider-top").cloneNode(true);
-			var briderside = theorbosvgdoc.getElementById("bassrider-side").cloneNode(true);
+			var briderfront = document.importNode(theorbosvgdoc.getElementById("bassrider-front"), true);
+			var bridertop = document.importNode(theorbosvgdoc.getElementById("bassrider-top"), true);
+			var briderside = document.importNode(theorbosvgdoc.getElementById("bassrider-side"), true);
 			
 			
 			// Top not drawn on concept drawings
@@ -1036,7 +1036,7 @@ function drawpegbox(frontview,sideview,detached){
 			
 			// Draw front view extension head
 			// var headgfront = makegroup(frontview, "theorbohead-rotate-front");
-			var headgfront = theorbohead_front.cloneNode(true);
+			var headgfront = document.importNode(theorbohead_front, true);
 			var headgpaths = headgfront.getElementsByTagName("path");
 			
 			// Get coordinates of bassnut line start and end points in non-translated space, for correctly positioning the upper pegbox
@@ -1127,7 +1127,7 @@ function drawpegbox(frontview,sideview,detached){
 			// var stringb = drawline (sideview,[bo,stringend], "","bass_strings_side");
 			
 			// Draw extension head
-			var headg = theorbohead.cloneNode(true);
+			var headg = document.importNode(theorbohead, true);
 			// Find named paths in theorbohead for positioning
 			addel(sideview, headg);
 			var headgpaths = headg.getElementsByTagName("path");
@@ -1653,9 +1653,9 @@ function drawneck(frontview,edge,trebleside){
 	bfrontg.style = "display:none;";
 	// Get selected bridge style or if editorstate.bridgestyle is not available, use a default
 	if (editorstate.bridgestyle){
-		var bridgeend = bridgelist[editorstate.bridgestyle].cloneNode(true);
+		var bridgeend = document.importNode(bridgelist[editorstate.bridgestyle], true);
 	} else { // default case for first time run
-		var bridgeend = bridgelist["renaissance"].cloneNode(true);
+		var bridgeend = document.importNode(bridgelist["renaissance"], true);
 	}
 	
 	bridgeend.setAttribute("transform",""); // Remove any transforms from group
