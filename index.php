@@ -39,6 +39,7 @@ echo('
 
 <script src="lutedesigner-planmaker.js"></script>
 <script src="lutedesigner-gcode.js"></script>
+<script src="lutedesigner-camexport.js"></script>
 
 <script src="three-finger-debug.js"></script>
 
