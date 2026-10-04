@@ -735,100 +735,111 @@ function neckjoint_3D (points,ribs) {
 }
 
 function pathoffset(path,offset){
-	// var offset = editorstate.offset; // Shrink by
-	var accur = 0.1; // for calculating normals, how far to move along path for sampling position
-	// var path = currentbody.side;
+	// Offset path by distance offset to its right-hand side (inside of the body outlines).
+	// Cubic segments are offset exactly at their end points with unchanged tangent directions, and
+	// their control arms are scaled by (1 - offset*curvature) there. Each piece is split until the
+	// result stays within PATHOFFSET_TOL of the true offset curve. Nodes where the path has a corner
+	// are mitred so the offset path stays continuous.
+	var PATHOFFSET_TOL = 0.005;
 	path = path.cloneNode(true);
 	convertToAbsolute(path);
-	// console.log("pathoffset", path);
 	var newpath = creel("path", path.id+"-inside", "", ["d",""], NAMESPACE);
 	newpath.setAttribute("style",OCTSTYLE);
 	addel(getelid("sideview"),newpath);
+
+	function sub(a,b){ return [a[0]-b[0], a[1]-b[1]]; }
+	function add(a,b){ return [a[0]+b[0], a[1]+b[1]]; }
+	function mul(a,s){ return [a[0]*s, a[1]*s]; }
+	function cross(a,b){ return a[0]*b[1] - a[1]*b[0]; }
+	function len(a){ return Math.hypot(a[0], a[1]); }
+	function unit(a){ var l = len(a); return l > 1e-12 ? [a[0]/l, a[1]/l] : null; }
+	function normal(t){ return [-t[1], t[0]]; } // Right-hand side in SVG coordinates
+	function bez(c,t){
+		var u = 1-t;
+		return [u*u*u*c[0][0] + 3*u*u*t*c[1][0] + 3*u*t*t*c[2][0] + t*t*t*c[3][0],
+				u*u*u*c[0][1] + 3*u*u*t*c[1][1] + 3*u*t*t*c[2][1] + t*t*t*c[3][1]];
+	}
+	function bezd(c,t){ // First derivative
+		var u = 1-t;
+		return [3*u*u*(c[1][0]-c[0][0]) + 6*u*t*(c[2][0]-c[1][0]) + 3*t*t*(c[3][0]-c[2][0]),
+				3*u*u*(c[1][1]-c[0][1]) + 6*u*t*(c[2][1]-c[1][1]) + 3*t*t*(c[3][1]-c[2][1])];
+	}
+	function split(c){ // De Casteljau at t=0.5
+		var m = function(a,b){ return [(a[0]+b[0])/2, (a[1]+b[1])/2]; };
+		var p01 = m(c[0],c[1]), p12 = m(c[1],c[2]), p23 = m(c[2],c[3]);
+		var p012 = m(p01,p12), p123 = m(p12,p23), mid = m(p012,p123);
+		return [[c[0],p01,p012,mid], [mid,p123,p23,c[3]]];
+	}
+	function starttangent(c){ return unit(sub(c[1],c[0])) || unit(sub(c[2],c[0])) || unit(sub(c[3],c[0])); }
+	function endtangent(c){ return unit(sub(c[3],c[2])) || unit(sub(c[3],c[1])) || unit(sub(c[3],c[0])); }
+	function curvature(d1,d2){ var l = len(d1); return l > 1e-9 ? cross(d1,d2)/(l*l*l) : 0; }
+	function offsetcubic(c, p0, p3){
+		// Offset curve of cubic c with given offset end points, keeping end tangents
+		var k0 = curvature(mul(sub(c[1],c[0]),3), mul(add(sub(c[2],mul(c[1],2)),c[0]),6));
+		var k1 = curvature(mul(sub(c[3],c[2]),3), mul(add(sub(c[3],mul(c[2],2)),c[1]),6));
+		return [p0, add(p0, mul(sub(c[1],c[0]), 1-offset*k0)), add(p3, mul(sub(c[2],c[3]), 1-offset*k1)), p3];
+	}
+	function trueoffset(c,t){ var tn = unit(bezd(c,t)); return tn ? add(bez(c,t), mul(normal(tn), offset)) : null; }
+	function fit(c, p0, p3, depth, out){
+		// Append offset cubics for c to out, splitting until within tolerance
+		var o = offsetcubic(c, p0, p3), err = 0;
+		for (var t=0.25; t<1; t+=0.25){
+			var q = trueoffset(c,t);
+			if (q) err = Math.max(err, len(sub(bez(o,t), q)));
+		}
+		if (err <= PATHOFFSET_TOL || depth >= 6){ out.push(o); return; }
+		var h = split(c), mid = trueoffset(c,0.5) || bez(o,0.5);
+		fit(h[0], p0, mid, depth+1, out);
+		fit(h[1], mid, p3, depth+1, out);
+	}
+
+	// Collect segments as lines and cubics in absolute coordinates
 	var seglist = path.pathSegList;
-	var newseglist = newpath.pathSegList;
-	var segs = seglist.numberOfItems;
-	var displaced = [];
-	var curlen = 0;
-	// Find coordinates for each node and control point by rebuilding path and using the very limited built-in functionality of the browser
-	// Nodes are of course stored as coordinates in the svg path, but this way we can get their absolute coordinates and also distance along path from start.
-	for (var i=0; i<segs; i++){
-		
-		var seg = seglist.getItem(i);
-		newseglist.appendItem(seg);
-		curlen = newpath.getTotalLength();
-		// Calculate normal angle for this node
-		var p1 = newpath.getPointAtLength(curlen-accur);
-		var p2 = newpath.getPointAtLength(curlen); // curlen+accur if you want to be exact, but then newseglist.appendItem(seglist[i]) has to happen after this 
-		var h = p1.y-p2.y;
-		var w = p1.x-p2.x;
-		var angle = Math.atan(h/w) -Math.PI/2;
-		if (isNaN(angle)) angle =  -Math.PI/2; // First point
-		if (w<0) angle = angle -Math.PI;
-		// console.log(h,w,angle);
-		// Calculate displacement for this node
-		var xd =  offset * Math.cos(angle);
-		var yd =  offset * Math.sin(angle);
-		var nc = {x:xd, y:yd};
-		var cp1 = new Point (0, 0);
-		var cp2 = new Point (0, 0);
-		// Find control point lengths and angles, adjust length, save displacement vectors
-		if (i>0 && seg.x2) { // If curve
-			// Get absolute coordinates - the path was converted to absolute above
-			var prevseg = seglist.getItem(i-1);
-			cp1 = new Point(seg.x1,seg.y1);
-			cp2 = new Point(seg.x2,seg.y2);
-			var node1 = new Point(prevseg.x,prevseg.y);
-			var node2 = new Point(seg.x,seg.y);
-			var nnode1 = node1.addpoint(displaced[i-1].coords); 
-			var nnode2 = node2.addpoint(nc); 
-			
-			// Find original vs. new segment width and height
-			var segw = Math.abs(node1.x-node2.x);
-			var segh = Math.abs(node1.y-node2.y);
-			var neww = Math.abs(nnode1.x-nnode2.x);
-			var newh = Math.abs(nnode1.y-nnode2.y);
-			// Find width and height percentages
-			var wp = neww/segw;
-			var hp = newh/segh;
-			// var fl = getelid("formlayer");
-			// drawshape(fl,[node1, {x:node2.x,y:node1.y}, node2,
-								 // {x:node1.x,y:node2.y}],HANDLESEGPOINTSTYLE,null, z=true)
-			// drawshape(fl,[nnode1, {x:nnode2.x,y:nnode1.y}, nnode2,
-								 // {x:nnode1.x,y:nnode2.y}],HANDLEPOINTSTYLE,null, z=true)
-			// drawline(fl, [node1,cp1]);
-			// drawline(fl, [node2,cp2]);
-			// drawline(fl, [node1,nnode1]);
-			// Define control points relative to node2
-			cp1 = cp1.minuspoint(node1).scale(wp,hp).addpoint(nnode1);
-			cp2 = cp2.minuspoint(node1).scale(wp,hp).addpoint(nnode1);
-			// drawline(fl, [nnode1,cp1]);
-			// drawline(fl, [nnode2,cp2]);
-			// console.log("w,h%:", i, cp2);
-			// Shorten control point vectors by percentages
-			
+	var segs = [], cur = [0,0], start = [0,0], closed = false;
+	for (var i=0; i<seglist.numberOfItems; i++){
+		var s = seglist.getItem(i), type = s.pathSegTypeAsLetter.toUpperCase();
+		if (type == "M"){ cur = start = [s.x, s.y]; continue; }
+		if (type == "Z"){ closed = true; continue; }
+		var end = [type == "V" ? cur[0] : s.x, type == "H" ? cur[1] : s.y];
+		if (type == "C") segs.push({c:[cur, [s.x1,s.y1], [s.x2,s.y2], end]});
+		else {
+			if (type != "L" && type != "H" && type != "V") console.log("pathoffset: segment treated as line:", type);
+			segs.push({line:[cur, end]});
 		}
-		
-		// Save new point displacement data in list
-		displaced.push({"coords":nc, "cp1":cp1,"cp2":cp2});
+		cur = end;
 	}
-	// console.log(newseglist);
-	// console.log(displaced);
-	// Rebuild new path again with changed coordinates
-	for (var i=0; i<segs; i++){
-		var newseg = newseglist.getItem(i);
-		newseg.x += displaced[i].coords.x;
-		newseg.y += displaced[i].coords.y;
-		if (i>0 && newseg.x1){
-		// With last node
-		newseg.x1 = displaced[i].cp1.x;
-		newseg.y1 = displaced[i].cp1.y;
-		// With last and this node
-		newseg.x2 = displaced[i].cp2.x ;
-		newseg.y2 = displaced[i].cp2.y;
-		}
-		
+	if (!segs.length) return newpath;
+
+	// Offset each node: along the normal, mitred where the tangent changes direction
+	function tin(sg){ return sg.c ? endtangent(sg.c) : unit(sub(sg.line[1],sg.line[0])); }
+	function tout(sg){ return sg.c ? starttangent(sg.c) : unit(sub(sg.line[1],sg.line[0])); }
+	function nodeoffset(p, ta, tb){
+		var na = ta ? normal(ta) : null, nb = tb ? normal(tb) : null;
+		if (!na) na = nb; if (!nb) nb = na;
+		if (!na) return p;
+		var m = unit(add(na,nb)) || na;
+		var cosh = Math.max(0.25, m[0]*na[0] + m[1]*na[1]); // Limit mitre length at sharp corners
+		return add(p, mul(m, offset/cosh));
 	}
-	// drawshape(getelid("formlayer"), displaced, OCTSTYLE,"", false);
+	var nodes = [];
+	nodes.push(nodeoffset(segs[0].c ? segs[0].c[0] : segs[0].line[0], closed ? tin(segs[segs.length-1]) : null, tout(segs[0])));
+	for (var i=0; i<segs.length; i++){
+		var next = i < segs.length-1 ? segs[i+1] : (closed ? segs[0] : null);
+		var p = segs[i].c ? segs[i].c[3] : segs[i].line[1];
+		nodes.push(nodeoffset(p, tin(segs[i]), next ? tout(next) : null));
+	}
+
+	// Build the offset path
+	var f = function(p){ return p[0]+" "+p[1]; };
+	var d = "M "+f(nodes[0]);
+	for (var i=0; i<segs.length; i++){
+		if (segs[i].line){ d += " L "+f(nodes[i+1]); continue; }
+		var pieces = [];
+		fit(segs[i].c, nodes[i], nodes[i+1], 0, pieces);
+		pieces.forEach(function(o){ d += " C "+f(o[1])+" "+f(o[2])+" "+f(o[3]); });
+	}
+	if (closed) d += " Z";
+	newpath.setAttribute("d", d);
 	return newpath;
 }
 
