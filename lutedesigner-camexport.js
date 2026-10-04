@@ -24,32 +24,51 @@
 
 var CAM_FORMMODE = "technicalform";
 
-// Part sets offered in the export dialog.
+// Groups of part sets by usage: the instrument itself, one of the two mould types, reference templates
+var CAMGROUPS = [
+	{key:"instrument", label:"Instrument (every build)", file:"instrument", checked:true,
+		desc:"Parts of the lute itself."},
+	{key:"foamcore", label:"Foam-core mould", file:"foamcore_mould", checked:true,
+		desc:"Mould skeleton of rib supports and notched supports between the end blocks."},
+	{key:"carved", label:"Carved mould", file:"carved_mould", checked:false,
+		desc:"Mould skeleton of a bottom board and a middle board with cross supports standing in their slots."},
+	{key:"templates", label:"Reference templates", file:"templates", checked:false,
+		desc:"For checking and hand shaping, not mould parts."}
+];
+
+// Part sets offered in the export dialog, in group order.
 // parts() runs while the form drawing is shown and returns [{name, el, split}]
 // split: every closed outline in el becomes its own part
 var CAMSETS = [
-	{key:"body", label:"Body / soundboard outline", parts:function(){
+	{key:"body", group:"instrument", label:"Body / soundboard outline",
+		desc:"Soundboard / body outline (front view), joined into one closed outline.", parts:function(){
 		return []; // built separately, see cam_bodyoutline
 	}},
-	{key:"flatribs", label:"Flat rib templates", rotate:true, parts:function(){
+	{key:"flatribs", group:"instrument", label:"Flat rib templates", rotate:true,
+		desc:"Ribs unfolded flat: centre rib C, the numbered ribs and the two end clasp pieces. The rib strips are cut to these.", parts:function(){
 		var out = cam_children("flatribs-layer", /^flatribg-/);
 		var ec = getelid("endclasp-flat-template-group");
 		if (ec) out.push({name:"endclasp-flat", el:ec, split:true});
 		return out;
 	}},
-	{key:"ribsupports", label:"Rib supports", parts:function(){
+	{key:"ribsupports", group:"foamcore", label:"Rib supports",
+		desc:"One board per rib joint line (joint 0 = centre, the last = edge), following the joint from tail to neck block. Small notches mark the supports. Drawn soundboard edge up.", parts:function(){
 		return cam_children("formlayer", /^ribsupportg-/);
 	}},
-	{key:"foamform", label:"Foam core form: supports and blocks", parts:function(){
+	{key:"foamform", group:"foamcore", label:"Foam core supports and blocks",
+		desc:"Notched plywood supports and the butt (tail) and neck blocks.", parts:function(){
 		return cam_children("formlayer", /^(supportg-|formblock-)/);
 	}},
-	{key:"carvedform", label:"Carved form: bottom and middle", parts:function(){
+	{key:"carvedform", group:"carved", label:"Carved form: bottom and middle",
+		desc:"Bottom board (body outline with centre strip) and middle profile board, with slots for the cross supports.", parts:function(){
 		return cam_children("formlayer", /^carved-form-/);
 	}},
-	{key:"crosssupports", label:"Cross supports", parts:function(){
-		return cam_children("formlayer", /^(cross-support-|last-support-|necblock-face-)/);
+	{key:"crosssupports", group:"carved", label:"Cross supports",
+		desc:"Quarter cross sections standing in the carved form slots: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
+		return cam_children("formlayer", /^(cross-support-|last-support-|necblock-face-|adaptor-face-|helper-face-)/);
 	}},
-	{key:"templates", label:"Cross section and neck block templates", parts:function(){
+	{key:"templates", group:"templates", label:"Cross section and neck block templates",
+		desc:"Cross section at the widest point, neck block joint outline and neck block side template, for checking and hand shaping.", parts:function(){
 		return ["cross-section", "neckblock-side-template", "neckblock-group"]
 			.filter(function(id){ return getelid(id); })
 			.map(function(id){ return {name:id, el:getelid(id)}; });
@@ -652,7 +671,7 @@ function cam_build(keys, opts){
 			var parts = cam_gatherset(set, root);
 			if (!opts.marks) parts = parts.map(function(p){ return {name:p.name, cut:p.cut, marks:[]}; });
 			if (set.rotate) parts = parts.map(cam_minrotate);
-			results.push({key:set.key, label:set.label, parts:parts, layout:cam_layout(parts, sheetwidth, gap)});
+			results.push({key:set.key, label:set.label, group:set.group, desc:set.desc, parts:parts, layout:cam_layout(parts, sheetwidth, gap)});
 		});
 		return results;
 	});
@@ -663,7 +682,7 @@ function cam_filename(suffix, ext){
 }
 
 function cam_download(fname, txt){
-	var type = /\.dxf$/.test(fname) ? "application/dxf" : "image/svg+xml";
+	var type = /\.dxf$/.test(fname) ? "application/dxf" : /\.html$/.test(fname) ? "text/html" : "image/svg+xml";
 	var url = URL.createObjectURL(new Blob([txt], {type:type}));
 	var a = document.createElement("a");
 	a.href = url;
@@ -674,23 +693,107 @@ function cam_download(fname, txt){
 	setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
 }
 
+function cam_group(key){
+	for (var i=0; i<CAMGROUPS.length; i++) if (CAMGROUPS[i].key == key) return CAMGROUPS[i];
+	return null;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Parts guide: HTML page showing what each set contains
+///////////////////////////////////////////////////////////////////////////////
+
+function cam_partlabel(key, name){
+	// Readable part names for the guide, matching the numbers printed on the drawing
+	var m;
+	if (key == "flatribs"){
+		if ((m = name.match(/^flatribg-(\d+)$/))) return m[1] == "1" ? "C" : String(parseInt(m[1])-1);
+		return name == "endclasp-flat-1" ? "end clasp" : "";
+	}
+	if (key == "ribsupports") return "joint " + name.replace("ribsupportg-", "");
+	return name.replace(/^(supportg-|cross-support-|carved-form-|formblock-)/, "").replace(/-group$/, "");
+}
+
+function cam_guide(results){
+	// results from cam_build, with marks
+	var colors = {instrument:"#1f77b4", foamcore:"#2ca02c", carved:"#ff7f0e", templates:"#9467bd"};
+	var title = "CAM export guide - "+(editorstate.bodyshapefromlist || "lute")+" "+editorstate.mensur+" mm";
+	var html = "";
+	CAMGROUPS.forEach(function(g){
+		var sets = results.filter(function(r){ return r.group == g.key; });
+		if (!sets.length) return;
+		var col = colors[g.key] || "#555";
+		html += '<h2 style="margin:18px 10px 4px;color:'+col+'">'+g.label+'</h2><p style="margin:0 10px 6px;font-size:13px">'+g.desc+
+			' File: <code>'+cam_filename(g.file, "dxf")+'</code></p>';
+		sets.forEach(function(r){
+			var L = r.layout, W = 760, s = Math.min((W-20)/(L.width || 1), 260/(L.height || 1));
+			var tf = function(q){ return [10+q[0]*s, 14+q[1]*s]; };
+			var svg = "";
+			L.parts.forEach(function(p){
+				var bb = cam_bbox(p.cut.concat(p.marks));
+				p.cut.forEach(function(sub){ svg += '<path d="'+cam_d(cam_mapsub(sub, tf))+'" fill="'+col+'22" stroke="'+col+'" stroke-width="1.2"/>'; });
+				p.marks.forEach(function(sub){ svg += '<path d="'+cam_d(cam_mapsub(sub, tf))+'" fill="none" stroke="'+col+'" stroke-width="0.6" stroke-dasharray="3,2"/>'; });
+				svg += '<text x="'+(10+(bb.x0+bb.x1)/2*s).toFixed(1)+'" y="'+(14+bb.y1*s+11).toFixed(1)+'" font-size="9" text-anchor="middle" fill="#555">'+cam_partlabel(r.key, p.name)+'</text>';
+			});
+			html += '<div style="background:#fff;border:1px solid #ccc;border-left:6px solid '+col+';margin:6px 10px;padding:6px 8px">'+
+				'<div style="font-size:14px"><b>'+r.label+'</b> <span style="color:#666">- '+r.parts.length+' part'+(r.parts.length > 1 ? 's' : '')+
+				', DXF layers <code>'+r.key.toUpperCase()+'_CUT</code> / <code>'+r.key.toUpperCase()+'_MARK</code></span></div>'+
+				'<div style="font-size:12px;margin:2px 0 4px">'+r.desc+'</div>'+
+				'<svg width="'+W+'" height="'+(L.height*s+32).toFixed(0)+'" font-family="sans-serif" style="max-width:100%;height:auto">'+svg+'</svg></div>';
+		});
+	});
+	return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'+
+		'<title>'+title+'</title><style>body{margin:0;background:#f4f4f4;color:#000;font-family:sans-serif} code{font-size:11px}</style></head><body>'+
+		'<h1 style="margin:10px;font-size:18px">'+title+'</h1>'+
+		'<p style="margin:0 10px;font-size:13px">Every build needs the instrument parts and <b>one</b> of the two mould types. Solid = cut outline, dashed = marking, each set scaled to fit. Units mm, 1:1 in the DXF/SVG files.</p>'+
+		html+'<p style="margin:10px;font-size:11px;color:#666">Generated by Lute Designer, '+new Date().toISOString().slice(0,10)+'.</p></body></html>\n';
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Dialog
 ///////////////////////////////////////////////////////////////////////////////
+
+function cam_savedchoice(){
+	try { return JSON.parse(localStorage.getItem("cam-export-choice")) || null; } catch(e){ return null; }
+}
+
+function cam_groupcheckstate(gkey){
+	// Group tick reflects its sets: checked, unchecked or partly
+	var cbs = document.querySelectorAll('.cam-set-cb[data-group="'+gkey+'"]');
+	var on = 0;
+	for (var i=0; i<cbs.length; i++) if (cbs[i].checked) on++;
+	var g = document.querySelector('.cam-group-cb[value="'+gkey+'"]');
+	g.checked = on == cbs.length;
+	g.indeterminate = on > 0 && on < cbs.length;
+}
+
+function cam_togglegroup(el){
+	var cbs = document.querySelectorAll('.cam-set-cb[data-group="'+el.value+'"]');
+	for (var i=0; i<cbs.length; i++) cbs[i].checked = el.checked;
+	el.indeterminate = false;
+}
 
 function cam_opendialog(){
 	var dlg = getelid("cam-export-dialog");
 	if (!dlg){
 		dlg = document.createElement("div");
 		dlg.id = "cam-export-dialog";
-		dlg.style.cssText = "position:fixed; top:10%; left:50%; transform:translateX(-50%); background:#fff; color:#000;"+
-			"border:1px solid #888; padding:16px; z-index:1000; min-width:320px; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.3);";
+		dlg.style.cssText = "position:fixed; top:5%; left:50%; transform:translateX(-50%); background:#fff; color:#000; max-height:90vh; overflow:auto;"+
+			"border:1px solid #888; padding:16px; z-index:1000; min-width:340px; font-family:sans-serif; box-shadow:0 4px 12px rgba(0,0,0,0.3);";
+		var saved = cam_savedchoice();
 		var html = '<h3 style="margin:0 0 10px">Export parts for CAM</h3>';
-		CAMSETS.forEach(function(set){
-			html += '<label style="display:block"><input type="checkbox" class="cam-set-cb" value="'+set.key+'" checked> '+set.label+'</label>';
+		CAMGROUPS.forEach(function(g){
+			html += '<label style="display:block;font-weight:bold;margin-top:6px" title="'+g.desc+'"><input type="checkbox" class="cam-group-cb" value="'+g.key+'" onchange="cam_togglegroup(this);"> '+g.label+'</label>';
+			CAMSETS.forEach(function(set){
+				if (set.group != g.key) return;
+				var on = saved && saved[set.key] !== undefined ? saved[set.key] : g.checked;
+				html += '<label style="display:block;margin-left:1.5em" title="'+set.desc+'"><input type="checkbox" class="cam-set-cb" data-group="'+g.key+'" value="'+set.key+'"'+
+					(on ? ' checked' : '')+' onchange="cam_groupcheckstate(\''+g.key+'\');"> '+set.label+'</label>';
+			});
 		});
-		html += '<hr><label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
-			'<label style="display:block"><input type="checkbox" id="cam-onefile"> All parts in one file</label>'+
+		html += '<hr><label style="display:block">Files <select id="cam-files">'+
+				'<option value="group" selected>One per group</option><option value="set">One per part set</option><option value="one">All parts in one file</option></select></label>'+
+			'<label style="display:block"><input type="checkbox" id="cam-guide" checked> Include parts guide (HTML)</label>'+
+			'<label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
 			'<label style="display:block">Max layout width <input type="number" id="cam-sheetwidth" value="1200" min="100" step="10" style="width:6em"> mm</label>'+
 			'<label style="display:block">Gap between parts <input type="number" id="cam-gap" value="10" min="0" step="1" style="width:6em"> mm</label>'+
 			'<hr><label style="display:block">Format <select id="cam-format">'+
@@ -703,6 +806,7 @@ function cam_opendialog(){
 			'<button onclick="getelid(\'cam-export-dialog\').style.display=\'none\';" style="margin-left:8px">Close</button>';
 		dlg.innerHTML = html;
 		document.body.appendChild(dlg);
+		CAMGROUPS.forEach(function(g){ cam_groupcheckstate(g.key); });
 	}
 	getelid("cam-status").textContent = "";
 	dlg.style.display = "block";
@@ -711,6 +815,11 @@ function cam_opendialog(){
 function cam_exportselected(){
 	var keys = Array.prototype.slice.call(document.querySelectorAll(".cam-set-cb:checked")).map(function(cb){ return cb.value; });
 	if (!keys.length) return;
+	try {
+		var choice = {};
+		document.querySelectorAll(".cam-set-cb").forEach(function(cb){ choice[cb.value] = cb.checked; });
+		localStorage.setItem("cam-export-choice", JSON.stringify(choice)); // Remember the selection for next time
+	} catch(e){}
 	var results = cam_build(keys, {
 		marks: getelid("cam-marks").checked,
 		sheetwidth: parseFloat(getelid("cam-sheetwidth").value),
@@ -724,10 +833,23 @@ function cam_exportselected(){
 		if (format != "dxf") files.push([cam_filename(suffix, "svg"), cam_svg(title, blocks)]);
 		if (format != "svg") files.push([cam_filename(suffix, "dxf"), cam_dxf(title, blocks, dxfopts)]);
 	};
-	if (getelid("cam-onefile").checked){
-		add("cam", "all parts", results.map(function(r){ return {id:r.key, layout:r.layout}; }));
+	var block = function(r){ return {id:r.key, layout:r.layout}; };
+	var mode = getelid("cam-files").value;
+	if (mode == "one"){
+		add("cam", "all parts", results.map(block));
+	} else if (mode == "group"){
+		CAMGROUPS.forEach(function(g){
+			var sets = results.filter(function(r){ return r.group == g.key; });
+			if (sets.length) add(g.file, g.label, sets.map(block));
+		});
 	} else {
-		results.forEach(function(r){ add(r.key, r.label, [{id:r.key, layout:r.layout}]); });
+		results.forEach(function(r){ add(r.key, r.label, [block(r)]); });
+	}
+	if (getelid("cam-guide").checked && results.length){
+		// The guide always shows markings, so build it separately when they are switched off
+		var guideresults = getelid("cam-marks").checked ? results : cam_build(keys, {marks:true,
+			sheetwidth: parseFloat(getelid("cam-sheetwidth").value), gap: parseFloat(getelid("cam-gap").value)}).filter(function(r){ return r.parts.length; });
+		files.push([cam_filename("cam_guide", "html"), cam_guide(guideresults)]);
 	}
 	// Space out downloads so the browser does not drop them
 	files.forEach(function(f, i){
