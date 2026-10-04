@@ -274,7 +274,21 @@ function populateeditor(){
 					getelid(targets[i]).checked = false;
 				}
 			} else {
-				getelid(targets[i]).value = editorstate[targets[i]];
+				var field = getelid(targets[i]);
+				if (field.tagName == "SELECT" && editorstate[targets[i]] !== undefined){
+					// Add values the list doesn't offer, so the field never shows blank or a different value
+					var exists = false;
+					for (var j=0; j<field.options.length; j++){
+						if (field.options[j].value == String(editorstate[targets[i]])) exists = true;
+					}
+					if (!exists){
+						var opt = document.createElement("option");
+						opt.value = editorstate[targets[i]];
+						opt.textContent = editorstate[targets[i]];
+						field.appendChild(opt);
+					}
+				}
+				field.value = editorstate[targets[i]];
 			}
 			
 		}
@@ -282,6 +296,7 @@ function populateeditor(){
 		// console.log("now", targets[i],  getelid(targets[i]).value);
 	}
 	makenutselectors();
+	changebodymethod(true); // Show or hide classical construction options to match bodyshapefrom
 }
 
 function stringing(){
@@ -498,7 +513,7 @@ window.onload = function() {
 		features_init[i](); 
 	}
 	
-	editorstate = defaultlute;
+	editorstate = JSON.parse(JSON.stringify(defaultlute)); // Copy, editing must not change the defaults
 
 	loadassets();
 

@@ -154,7 +154,7 @@ function upload_editorstate(el){
 	var reader = new FileReader();
 	reader.onload = function(e) {
 		console.log("result",e.target.result);
-		editorstate = JSON.parse(e.target.result);
+		editorstate = instrument_settings(JSON.parse(e.target.result));
 		// Make sure loaded values are displayed in the editor
 		backup();
 		populateeditor();

@@ -17,12 +17,21 @@
 */
 // This file contains baked presets for entire instruments and methods for creating them
 
-function select_instrument(el){
-	// editorstate = instrumentpresets[el.value]; // Get preset editorstate. This allows the original to be modified, copy each value instead
-	var fields = Object.getOwnPropertyNames(instrumentpresets[el.value]);
+function instrument_settings(preset){
+	// Complete editorstate for a preset or a loaded file: defaults first, so that settings the preset
+	// leaves out don't carry over from the previous instrument, then the current view settings, then the preset
+	var state = JSON.parse(JSON.stringify(PRESET_BASE));
+	if (editorstate.drawingpurpose !== undefined) state.drawingpurpose = editorstate.drawingpurpose;
+	if (editorstate.pagetitle !== undefined) state.pagetitle = editorstate.pagetitle;
+	var fields = Object.getOwnPropertyNames(preset);
 	for (var i=0; i<fields.length; i++){
-		editorstate[fields[i]] = instrumentpresets[el.value][fields[i]];
+		state[fields[i]] = preset[fields[i]];
 	}
+	return JSON.parse(JSON.stringify(state)); // Copy, so editing never changes the preset
+}
+
+function select_instrument(el){
+	editorstate = instrument_settings(instrumentpresets[el.value]);
 	backup(); // Make hash with editorstate data
 	populateeditor(); // This fills the editor with data from editorstate
 	makedrawing("select_instrument");
@@ -124,6 +133,23 @@ var instrumentpresets = {
 }
 // defaultlute is venere 585mm 1x1+2x6, but loaded from here only on startup. If it were loaded from instrumentpresets it would get corrupted. It would need to be copied...
 var defaultlute = {"drawingpurpose":"concept","constructor":"construct","presetoverlay":false,"bodyshapefromlist":"venere","numberofribs":25,"bulge":2.2,"divisions":9,"ribspread":1,"rosettelist":"single","rosettescale":100,"mensur":585,"fingerboardcourses":7,"chanterelles":1,"singlestrings":false,"hasdiapasons":false,"mensur_1":1700,"courses_1":7,"singles_1":true,"fretsonneck":8.4,"fingerboardstyle":"fangs","neckwidthlimit":100,"neckadd":0,"pegboxstyle":"renaissance","foldable":false,"bridgestyle":"renaissance","bridgeoffset":8,"distcoursesbridge":9.9,"diststringsbridge":5,"distchanterellesbridge":10.5,"distbasscoursesbridge":9.9,"distcoursesnut":6.4,"distchanterellesnut":8.1,"diststringsnut":2.5,"distbasscoursesshortnut":3.6,"distbasscoursesnut":5,"bodyscale":1.0};
+// Base for loading presets: defaultlute plus values for settings that not every preset defines
+var PRESET_BASE = JSON.parse(JSON.stringify(defaultlute));
+PRESET_BASE.numbernuts = 1;
+PRESET_BASE.drawallstrings = false;
+PRESET_BASE.ribspacing = "evenclasp";
+PRESET_BASE.limitorset = "limit";
+PRESET_BASE.bodyshapefrom = "fromlist";
+// Classical construction defaults, same as the editor's input defaults
+PRESET_BASE.constructionmensur = 600;
+PRESET_BASE.constructionbottom = 6;
+PRESET_BASE.constructionside = 6;
+PRESET_BASE.constructionsmall = 1.333333;
+PRESET_BASE.constructionwidth = 4;
+PRESET_BASE.constructionlength = 6.5;
+PRESET_BASE.constructionwedge = 0;
+PRESET_BASE.constructionshoulder = 0;
+PRESET_BASE.constructionshoulderlength = 0;
 
 // Chanterelle rider shape
 var chanterelle_top = "m 0,0 l 5.6,0.1 m -6.6,-3.5 c -0.4,0 0,7.2 0.3,7.1 c 0.6,0.1 0.1,-7.1 -0.3,-7.1 z m 0.8,16.1 c 0.2,-7.8 -0.1,-21.2 -1.2,-21.1 c -1.1,0.4 0.4,12.7 1.2,21.1 l 6,0 l 0,-21.1 l 4,0 l 0,59.5 l -9,0 c 0.8,-26.3 -6.7,-36.2 -6,-59.5 l 3.8,0";

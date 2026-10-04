@@ -241,7 +241,7 @@ function decidesize(drawing, frontview,sideview){
 	// } else {// First time with this body
 		// Set currentbody depending on body construction method
 		var name = editorstate.bodyshapefromlist || "venere";
-		if (getelid("bodyshapefrom").value == "fromlist"){
+		if ((editorstate.bodyshapefrom || getelid("bodyshapefrom").value) == "fromlist"){
 			// Use neckC historical model
 			
 			var edge = bodylist[name].side;
@@ -256,12 +256,12 @@ function decidesize(drawing, frontview,sideview){
 		var side = copyelement(frontview, edge, zeropoint,THINSTYLE); 
 		// Classical edge and mid are both built with id "side", give the copies unique ids
 		// so that derived paths (-mirrored, -inside) don't overwrite each other
-		if (getelid("bodyshapefrom").value != "fromlist") side.id = "classical-side";
+		if ((editorstate.bodyshapefrom || getelid("bodyshapefrom").value) != "fromlist") side.id = "classical-side";
 		scalepath(side, editorstate.bodyscale);
 		var trebleside = mirrorpath(frontview,side); // Mirror path d coordinates, maintain first point, return new path
 		// console.log("mid",mid);
 		var middle = copyelement(sideview, mid, zeropoint,THINSTYLE); 
-		if (getelid("bodyshapefrom").value != "fromlist") middle.id = "classical-middle";
+		if ((editorstate.bodyshapefrom || getelid("bodyshapefrom").value) != "fromlist") middle.id = "classical-middle";
 		scalepath(middle, editorstate.bodyscale);
 		// console.log("middle",middle);
 		currentbody = {"side":side,"trebleside":trebleside,"middle":middle};
@@ -1540,7 +1540,7 @@ function drawneck(frontview,edge,trebleside){
 		var trebp = trebfang.movedist(fangd+sb_e, (angle/2-Math.PI));
 		// Fangs are between inter (treble side) and bass_inter
 		// if (editorstate.bodyshapefrom != "classical"){
-		if (getelid("bodyshapefrom").value != "classical"){
+		if ((editorstate.bodyshapefrom || getelid("bodyshapefrom").value) != "classical"){
 			// Add white rectangle to cover the soundboard top edges
 			var covertangle = drawshape(frontview, 
 				[bass_inter,inter, trebp,bassp], 
