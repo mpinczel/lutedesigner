@@ -36,6 +36,7 @@ function start_bodyviewer(bbutn){
 function stop_bodyviewer(bbutn){
 	cancelAnimationFrame( animation_id ); // Stop animating
 	controls.dispose(); // Remove eventlisteners from mouse buttons
+	renderer.dispose(); // Release the WebGL context, browsers only allow a few at a time
 	var bodyviewerdiv = getelid("bodyviewer");
 	delchildren(bodyviewerdiv); // Remove canvas 
 	bodyviewerdiv.className = "hidebodyviewer";
@@ -288,7 +289,7 @@ function init(el) {
 	// scene.add( directionalLight );
 	// directionalLight.target.position = new THREE.Vector3( 0,0,0 );
 	
-	controls = new THREE.OrbitControls( camera );
+	controls = new THREE.OrbitControls( camera, renderer.domElement ); // domElement is mandatory in three.js r124
 
 	//controls.update() must be called after any manual changes to the camera's transform
 	// camera.position.set( 0, 20, 100 );
