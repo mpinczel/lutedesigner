@@ -254,10 +254,14 @@ function decidesize(drawing, frontview,sideview){
 		// apply body scaling
 		
 		var side = copyelement(frontview, edge, zeropoint,THINSTYLE); 
+		// Classical edge and mid are both built with id "side", give the copies unique ids
+		// so that derived paths (-mirrored, -inside) don't overwrite each other
+		if (getelid("bodyshapefrom").value != "fromlist") side.id = "classical-side";
 		scalepath(side, editorstate.bodyscale);
 		var trebleside = mirrorpath(frontview,side); // Mirror path d coordinates, maintain first point, return new path
 		// console.log("mid",mid);
 		var middle = copyelement(sideview, mid, zeropoint,THINSTYLE); 
+		if (getelid("bodyshapefrom").value != "fromlist") middle.id = "classical-middle";
 		scalepath(middle, editorstate.bodyscale);
 		// console.log("middle",middle);
 		currentbody = {"side":side,"trebleside":trebleside,"middle":middle};
