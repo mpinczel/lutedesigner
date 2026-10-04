@@ -891,7 +891,7 @@ function drawpegbox(frontview,sideview,detached){
 		// Draw detached top view of pegbox
 		var edgew = plength-toplength;
 		// console.log(edgew,toplength,plength);
-		var pw = Math.sqrt((cps.ext1.x-cps.ext2.x)**2-(cps.ext1.y-cps.ext2.y)**2); // distance from extx1,y to extx2,y?
+		var pw = Math.hypot(cps.ext1.x-cps.ext2.x, cps.ext1.y-cps.ext2.y); // distance from ext1 to ext2
 		// console.log(pw); // Width of pegbox wider end
 		var dor = new Point(DETACHEDORIGIN.x, DETACHEDORIGIN.y);
 		var tr1 = new Point(dor.x-pw/2, dor.y+edgew);
