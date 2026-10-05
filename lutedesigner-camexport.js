@@ -476,6 +476,27 @@ function cam_minrotate(part){
 	return out;
 }
 
+function cam_fliphorizontal(part){
+	// Mirror a part left to right within its own bounding box
+	var b = cam_bbox(cam_partsubs(part)), sum = b.x0 + b.x1;
+	return cam_transformpart(part, function(p){ return [sum - p[0], p[1]]; });
+}
+
+function cam_ribpairs(parts){
+	// The templates cover half the bowl: add a mirrored copy of every rib except the centre rib
+	var out = [];
+	parts.forEach(function(p){
+		out.push(p);
+		var m = p.name.match(/^flatribg-(\d+)$/);
+		if (m && m[1] != "1"){
+			var copy = cam_fliphorizontal(p);
+			copy.name = p.name + "-mirrored";
+			out.push(copy);
+		}
+	});
+	return out;
+}
+
 function cam_layout(parts, sheetwidth, gap){
 	// Shelf packing: rows of parts, tallest first, starting at 0,0
 	var items = parts.map(function(p){ return {part:p, bb:cam_bbox(cam_partsubs(p))}; });
@@ -728,6 +749,7 @@ function cam_build(keys, opts){
 			var parts = cam_gatherset(set, root);
 			if (!opts.marks) parts = parts.map(function(p){ return {name:p.name, cut:p.cut, marks:[]}; });
 			if (set.rotate) parts = parts.map(cam_minrotate);
+			if (set.key == "flatribs" && opts.ribpairs) parts = cam_ribpairs(parts);
 			results.push({key:set.key, label:set.label, group:set.group, desc:set.desc, parts:parts, layout:cam_layout(parts, sheetwidth, gap)});
 		});
 		return results;
@@ -763,8 +785,8 @@ function cam_partlabel(key, name){
 	// Readable part names for the guide, matching the numbers printed on the drawing
 	var m;
 	if (key == "flatribs"){
-		if ((m = name.match(/^flatribg-(\d+)$/))) return m[1] == "1" ? "C" : String(parseInt(m[1])-1);
-		return name == "endclasp-flat-1" ? "end clasp" : "";
+		if ((m = name.match(/^flatribg-(\d+)(-mirrored)?$/))) return m[1] == "1" ? "C" : String(parseInt(m[1])-1) + (m[2] ? "m" : "");
+		return name == "endclasp-flat" || name == "endclasp-flat-1" ? "end clasp" : "";
 	}
 	if (key == "ribsupports") return "joint " + name.replace("ribsupportg-", "");
 	return name.replace(/^(supportg-|cross-support-|carved-form-|formblock-|simple-form2?-|simple2?-|cross2-support-)/, "").replace(/-group$/, "");
@@ -850,6 +872,7 @@ function cam_opendialog(){
 		html += '<hr><label style="display:block">Files <select id="cam-files">'+
 				'<option value="group" selected>One per group</option><option value="set">One per part set</option><option value="one">All parts in one file</option></select></label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-guide" checked> Include parts guide (HTML)</label>'+
+			'<label style="display:block" title="The rib templates cover half the bowl. Adds a mirrored copy of every rib except the centre rib, labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Rib pairs: mirrored copy of ribs 1 and up</label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
 			'<label style="display:block">Max layout width <input type="number" id="cam-sheetwidth" value="1200" min="100" step="10" style="width:6em"> mm</label>'+
 			'<label style="display:block">Gap between parts <input type="number" id="cam-gap" value="10" min="0" step="1" style="width:6em"> mm</label>'+
@@ -879,6 +902,7 @@ function cam_exportselected(){
 	} catch(e){}
 	var results = cam_build(keys, {
 		marks: getelid("cam-marks").checked,
+		ribpairs: getelid("cam-ribpairs").checked,
 		sheetwidth: parseFloat(getelid("cam-sheetwidth").value),
 		gap: parseFloat(getelid("cam-gap").value)
 	}).filter(function(r){ return r.parts.length; });
@@ -904,7 +928,7 @@ function cam_exportselected(){
 	}
 	if (getelid("cam-guide").checked && results.length){
 		// The guide always shows markings, so build it separately when they are switched off
-		var guideresults = getelid("cam-marks").checked ? results : cam_build(keys, {marks:true,
+		var guideresults = getelid("cam-marks").checked ? results : cam_build(keys, {marks:true, ribpairs: getelid("cam-ribpairs").checked,
 			sheetwidth: parseFloat(getelid("cam-sheetwidth").value), gap: parseFloat(getelid("cam-gap").value)}).filter(function(r){ return r.parts.length; });
 		files.push([cam_filename("cam_guide", "html"), cam_guide(guideresults)]);
 	}
