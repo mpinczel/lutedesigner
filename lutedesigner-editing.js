@@ -531,13 +531,11 @@ function spacingpresetchange(el){
 function hidehandles(src){
 	var handles = getelid("handlelayer");
 	var btn = getelid("hidehandles");
-	if (btn.innerHTML == "Hide handles"){
-		if (handles) handles.classList.add("hidehandles");
-		btn.innerHTML = "Show handles";
-	} else {
-		if (handles) handles.classList.remove("hidehandles");
-		btn.innerHTML = "Hide handles";
-	}
+	// The state is kept on the button, its text may be translated
+	var hide = btn.dataset.hidden != "1";
+	btn.dataset.hidden = hide ? "1" : "";
+	if (handles) handles.classList.toggle("hidehandles", hide);
+	btn.innerHTML = _t(hide ? "Show handles" : "Hide handles");
 
 }
 
@@ -546,7 +544,7 @@ function drawhandles(){
 	// Draw handles for path editing
 	// Paths to be edited must be saved in global editable_paths[]
 	if (!getelid("hidehandles")) return;
-	if (getelid("hidehandles").innerHTML == "Show handles"){
+	if (getelid("hidehandles").dataset.hidden == "1"){
 		getelid("handlelayer").classList.add("hidehandles");
 	}
 	// var drawing = getelid("designer-canvas");

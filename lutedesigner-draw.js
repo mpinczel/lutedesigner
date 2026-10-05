@@ -1577,14 +1577,14 @@ function drawneck(frontview,edge,trebleside){// Draws neck, strings, bridge, nut
 			});
 			
 			// Draw text showing this nut's mensur in mm
-			drawtext(nutgroup, nutfirst.move(15), "Nut "+n+": "+getmensur(n).toFixed(0));
+			drawtext(nutgroup, nutfirst.move(15), _t("Nut "+n+": "+getmensur(n).toFixed(0)));
 			
 			// Store for posterity
 			cps.bassnuts.push(nutfirst);
 			
 		} else {
 			var nutfirst = chan;
-			drawtext(nutgroup, nutfirst.move(15), "Nut: "+getmensur(n).toFixed(0));
+			drawtext(nutgroup, nutfirst.move(15), _t("Nut: "+getmensur(n).toFixed(0)));
 		}
 		// Draw intervening strings on all nuts if chosen
 		
@@ -1691,7 +1691,7 @@ function drawneck(frontview,edge,trebleside){// Draws neck, strings, bridge, nut
 			}else if (i==3) {
 				ord = "3rd";
 			}
-			drawtext(frets, {x:nut.x+Tx+3.0, y:nut.y+Ty+3}, ord+": "+postext, SMALLTEXT);//+" - "+postext2);
+			drawtext(frets, {x:nut.x+Tx+3.0, y:nut.y+Ty+3}, _t(ord+": "+postext), SMALLTEXT);//+" - "+postext2);
 		}
 		// }
 	}
@@ -1782,9 +1782,10 @@ function drawinfobox(infobox){
 	
 	for (const line of content){
 		if (line!==undefined && line[0]!==undefined && line[1]!==undefined){
-		var w = line[0].length * textw +10;
-		drawtext(infobox, z.move(-w,h), line[0], GRAYTEXT);
-		drawtext(infobox, z.move(0,h), line[1]);
+		var label = _t(line[0]);
+		var w = label.length * textw +10;
+		drawtext(infobox, z.move(-w,h), label, GRAYTEXT);
+		drawtext(infobox, z.move(0,h), typeof line[1] == "string" ? _t(line[1]) : line[1]);
 		// console.log(line[0],line[1]);
 		h+=lh; // next line
 		}

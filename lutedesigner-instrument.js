@@ -2093,13 +2093,13 @@ Instrument.prototype.draw_info = function(origin){ // Draw instrument informatio
 	// Date
 	// Project name
 	// TEXTSTYLE
-	var t = drawtext(infoview, zeropoint.move(-5), "Project Title", GRAYTEXT);
+	var t = drawtext(infoview, zeropoint.move(-5), _t("Project Title"), GRAYTEXT);
 	movetext(t); // Move left by width
-	var t = drawtext(infoview, zeropoint.move(-5,10), "Body Shape", GRAYTEXT);
+	var t = drawtext(infoview, zeropoint.move(-5,10), _t("Body Shape"), GRAYTEXT);
 	movetext(t);
-	var t = drawtext(infoview, zeropoint.move(-5,20), "Created on", GRAYTEXT);
+	var t = drawtext(infoview, zeropoint.move(-5,20), _t("Created on"), GRAYTEXT);
 	movetext(t);
-	var t = drawtext(infoview, zeropoint.move(-5,30), "Strings", GRAYTEXT);
+	var t = drawtext(infoview, zeropoint.move(-5,30), _t("Strings"), GRAYTEXT);
 	movetext(t);
 	// TODO: movetext places text differently when page first loads vs after page has been zoomed, because viewbox then gets more correct(?) second parameter. 
 	
@@ -2113,7 +2113,7 @@ Instrument.prototype.draw_info = function(origin){ // Draw instrument informatio
 	} else if (this.ed.bodyshapefrom == "guitar"){
 		drawtext(infoview, zeropoint.move(0,10), this.ed.guitarfromlist);
 	} else {
-		drawtext(infoview, zeropoint.move(0,10), "Constructed");
+		drawtext(infoview, zeropoint.move(0,10), _t("Constructed"));
 	}
 	var d = new Date();
 	drawtext(infoview, zeropoint.move(0,20), d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate());

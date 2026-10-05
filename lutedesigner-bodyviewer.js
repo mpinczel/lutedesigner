@@ -436,7 +436,7 @@ function init(el, what) {
 	} catch(e){
 		
 		console.log("Failed to initialize 3D view",e);
-		show_error("Failed to initialize 3D view");
+		show_error(_t("Failed to initialize 3D view"));
 		// stop_bodyviewer(bbutn);
 	}
 }

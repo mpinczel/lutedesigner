@@ -1685,8 +1685,8 @@ function drawfoamcore() {
 		tp = new Point(lute3d.inribpaths.Ypoints[lute3d.widest_i], tp-5);
 		// console.log("textpos: ", lute3d.widest_i);
 		var te="";
-		if (i==0) te = " (center)";
-		if (i==r.length-1) te = " (edge)";
+		if (i==0) te = " ("+_t("center")+")";
+		if (i==r.length-1) te = " ("+_t("edge")+")";
 		drawtext(ribg, tp, i+te);
 		
 		

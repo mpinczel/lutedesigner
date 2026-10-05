@@ -158,7 +158,7 @@ function show_error(msg){
 }
 window.onerror = function( msg, url, line ) {
 	if (document.getElementById("splasherror").innerHTML==""){
-		document.getElementById("splasherror").innerHTML += "Whoops! Something went wrong:<br>"
+		document.getElementById("splasherror").innerHTML += (typeof _t == "function" ? _t("Whoops! Something went wrong:") : "Whoops! Something went wrong:")+"<br>"
 	}
 	document.getElementById("splasherror").innerHTML += "ERROR: \"" + msg + " at \""+url.substr(url.lastIndexOf("/")+1) + "\", line " + line +"<br>";
 	
@@ -181,6 +181,8 @@ function progbar_advance(steps) {
 	} catch(e) {console.log(e);}
 }
 </script>
+<!--Interface languages, first so every script can use _t()-->
+<script src="lutedesigner-i18n.js"></script>
 <!--Replacement for removed SVG path segment API-->
 <!--<script src="pathseg.js"></script>-->
 <!--Lute designer helpers-->
