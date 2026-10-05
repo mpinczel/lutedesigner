@@ -2,6 +2,10 @@
 Online parametric lute design aid
 ## Available at:
 [Lutedesigner](https://www.niskanenlutes.com/lutedesigner/fullmode.php)
+## Portable version
+`python make_portable.py` builds `portable/LuteDesigner/` (and a zip of it): the page with its scripts, styles and
+images, which runs by opening `index.html` in a browser. No server, PHP or install is needed, so the folder can be
+copied to any computer, for example on a USB stick.
 ## Languages
 The interface is available in English and Hungarian (Magyar). Choose the language under the program name; the
 choice is remembered, and a Hungarian browser starts in Hungarian. Text drawn into the drawing (fret positions,
