@@ -402,7 +402,7 @@ function cam_bodyoutline(root){
 	if (dist(end(h1), h2.start) > 0.01) segs.push({t:"L", p:h2.start});
 	segs = segs.concat(h2.segs);
 	if (dist(end(h2), h1.start) > 0.01) segs.push({t:"L", p:h1.start});
-	return [{name:"body-outline", cut:[{start:h1.start, segs:segs, closed:true}], marks:[]}];
+	return [{name:"body-outline", cut:[cam_fixcurveloops({start:h1.start, segs:segs, closed:true})], marks:[]}];
 }
 
 function cam_joinmirrored(name, geom){
@@ -610,8 +610,11 @@ function cam_joinribtip(rib, tip){
 }
 
 function cam_removeloops(pts, maxarea){
-	// Remove small self-intersection loops (bow-ties at corners) by cutting them off at the crossing point
-	var area = function(q){ var a = 0; for (var i=0; i<q.length; i++){ var u = q[i], v = q[(i+1)%q.length]; a += u[0]*v[1]-v[0]*u[1]; } return Math.abs(a)/2; };
+	// Remove self-intersection loops by cutting them off at the crossing point: small ones (bow-ties at corners),
+	// and loops wound against the outline, where the boundary folds back on itself (e.g. a joint hole drawn over
+	// the edge of the part) as long as they are a small part of it
+	var sarea = function(q){ var a = 0; for (var i=0; i<q.length; i++){ var u = q[i], v = q[(i+1)%q.length]; a += u[0]*v[1]-v[0]*u[1]; } return a/2; };
+	var area = function(q){ return Math.abs(sarea(q)); };
 	var changed = false;
 	for (var guard=0; guard<100; guard++){
 		var n = pts.length, found = false;
@@ -628,8 +631,10 @@ function cam_removeloops(pts, maxarea){
 				// The crossing splits the outline in two loops, cut off whichever one is small
 				var inner = [x].concat(pts.slice(i+1, j+1));
 				var outer = [x].concat(pts.slice(j+1), pts.slice(0, i+1));
-				if (area(inner) <= maxarea) pts = pts.slice(0, i+1).concat([x], pts.slice(j+1));
-				else if (area(outer) <= maxarea) pts = [x].concat(pts.slice(i+1, j+1));
+				var si = sarea(inner), so = sarea(outer);
+				var removable = function(s, other){ return Math.abs(s) <= maxarea || (s*other < 0 && Math.abs(s) < 0.05*Math.abs(other)); };
+				if (removable(si, so)) pts = pts.slice(0, i+1).concat([x], pts.slice(j+1));
+				else if (removable(so, si)) pts = [x].concat(pts.slice(i+1, j+1));
 				else continue;
 				found = changed = true;
 			}
@@ -686,13 +691,31 @@ function cam_tidypart(part, set){
 	cut = cut.map(function(sub){
 		// Straight-line outlines: cut off tiny loops, drop duplicate and straight-through points
 		var pts = cam_linepts(sub);
-		if (!pts) return sub;
-		pts = cam_cleanpoly(cam_removeloops(pts, 1.0) || pts);
+		if (!pts) return cam_fixcurveloops(sub);
+		pts = cam_cleanpoly(cam_removeloops(pts, 5.0) || pts); // Real features are far larger than 5 mm²
 		var out = cam_polyline(pts.concat([pts[0]]), true);
 		out.src = sub.src;
 		return out;
 	});
 	return {name:part.name, cut:cut, marks:marks};
+}
+
+function cam_fixcurveloops(sub){
+	// An outline with curves that crosses itself (e.g. two halves overshooting where they meet) is flattened
+	// to fine straight segments and its loops cut off; outlines that do not cross themselves keep their curves
+	var pts = [sub.start], cur = sub.start;
+	sub.segs.forEach(function(s){
+		if (s.t == "C") cam_fitcubic([cur, s.c1, s.c2, s.p], 0.005, false, 0).forEach(function(pc){ pts.push(pc.p); });
+		else pts.push(s.p);
+		cur = s.p;
+	});
+	if (cam_vlen(cam_vsub(pts[pts.length-1], pts[0])) < 1e-6) pts.pop();
+	var fixed = cam_removeloops(pts, 5.0);
+	if (!fixed) return sub;
+	fixed = cam_cleanpoly(fixed);
+	var out = cam_polyline(fixed.concat([fixed[0]]), true);
+	out.src = sub.src;
+	return out;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
