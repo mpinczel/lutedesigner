@@ -72,6 +72,7 @@ var CAMSETS = [
 	}},
 	{key:"crosssupports", group:"carved", label:"Cross supports",
 		pair:function(name){ return true; }, // Quarter sections, one per side
+		reference:1, // Second outline is the cross section of the rest of the mould, drawn for reference
 		desc:"Quarter cross sections standing in the carved form slots, one per side: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
 		return cam_children("formlayer", /^(cross-support-|last-support-|necblock-face-|adaptor-face-|helper-face-)/);
 	}},
@@ -360,6 +361,7 @@ function cam_collect(el, root){
 			var last = t.segs[t.segs.length-1].p;
 			// A path ending where it started counts as closed even without z
 			if (!t.closed && Math.hypot(last[0]-t.start[0], last[1]-t.start[1]) < 0.01) t.closed = true;
+			t.src = s.id || ""; // Element id, used to tell markings and slots from outlines
 			(t.closed ? out.cut : out.marks).push(t);
 		});
 	});
@@ -447,6 +449,109 @@ function cam_splitparts(name, geom){
 	return parts;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Tidying parts for cutting: reference outlines and rib end pieces
+///////////////////////////////////////////////////////////////////////////////
+
+function cam_linepts(sub){
+	// Points of a straight-line subpath without the closing duplicate, or null if it has curves
+	if (sub.segs.some(function(s){ return s.t != "L"; })) return null;
+	var pts = [sub.start].concat(sub.segs.map(function(s){ return s.p; }));
+	var last = pts[pts.length-1];
+	if (Math.hypot(last[0]-pts[0][0], last[1]-pts[0][1]) < 1e-6) pts.pop();
+	return pts;
+}
+
+function cam_cleanpoly(pts){
+	// Drop points within 1 micron of the previous one and points on a straight line between their neighbours
+	var out = [];
+	pts.forEach(function(p){ if (!out.length || cam_vlen(cam_vsub(p, out[out.length-1])) > 1e-3) out.push(p); });
+	while (out.length > 3 && cam_vlen(cam_vsub(out[0], out[out.length-1])) <= 1e-3) out.pop();
+	for (var i=0; i<out.length && out.length > 3; ){
+		var a = out[(i-1+out.length)%out.length], b = out[i], c = out[(i+1)%out.length];
+		var ab = cam_vsub(b, a), bc = cam_vsub(c, b);
+		if (Math.abs(cam_vcross(ab, bc)) < 1e-6*cam_vlen(ab)*cam_vlen(bc) + 1e-9 && cam_vdot(ab, bc) > 0) out.splice(i, 1);
+		else i++;
+	}
+	return out;
+}
+
+function cam_joinribtip(rib, tip){
+	// The app splits each flat rib at the neck joint into the rib and its end piece beyond the joint.
+	// Join them back into the full rib strip: replace the rib's end edge with the end piece's outer side.
+	var P = cam_linepts(rib), T = cam_linepts(tip);
+	if (!P || !T || T.length < 3) return null;
+	var neckA = T[0], neckB = T[T.length-1]; // The end piece starts and ends on the neck joint line
+	var nearest = function(q){ var bi = 0, bd = Infinity; P.forEach(function(p, i){ var d = Math.hypot(p[0]-q[0], p[1]-q[1]); if (d < bd){ bd = d; bi = i; } }); return {i:bi, d:bd}; };
+	var a = nearest(neckA), b = nearest(neckB), n = P.length;
+	if (a.d > 5 || b.d > 5) return null;
+	// a and b must be the two ends of the rib's end edge
+	var chain;
+	if ((a.i+1) % n == b.i){ chain = []; for (var i=b.i; i!=a.i; i=(i+1)%n) chain.push(P[i]); chain.push(P[a.i]); }
+	else if ((b.i+1) % n == a.i){ chain = []; for (var i=a.i; i!=b.i; i=(i+1)%n) chain.push(P[i]); chain.push(P[b.i]); T = T.slice().reverse(); }
+	else return null;
+	// chain runs from one end edge vertex around the rib to the other. Continue with the end piece's points beyond
+	// the neck joint: the rib's last points and these were neighbours on the rib before the app split it.
+	var pts = chain.concat(T.slice(1, -1));
+	return {outline:cam_polyline(pts.concat([pts[0]]), true), neckline:cam_polyline([T[0], T[T.length-1]], false)};
+}
+
+function cam_removeloops(pts, maxarea){
+	// Remove small self-intersection loops (bow-ties at corners) by cutting them off at the crossing point
+	var area = function(q){ var a = 0; for (var i=0; i<q.length; i++){ var u = q[i], v = q[(i+1)%q.length]; a += u[0]*v[1]-v[0]*u[1]; } return Math.abs(a)/2; };
+	var changed = false;
+	for (var guard=0; guard<100; guard++){
+		var n = pts.length, found = false;
+		for (var i=0; i<n && !found; i++){
+			for (var j=i+2; j<n && !found; j++){
+				if (i == 0 && j == n-1) continue;
+				var p1 = pts[i], p2 = pts[(i+1)%n], q1 = pts[j], q2 = pts[(j+1)%n];
+				var d = (p2[0]-p1[0])*(q2[1]-q1[1]) - (p2[1]-p1[1])*(q2[0]-q1[0]);
+				if (Math.abs(d) < 1e-12) continue;
+				var a = ((q1[0]-p1[0])*(q2[1]-q1[1]) - (q1[1]-p1[1])*(q2[0]-q1[0]))/d;
+				var b = ((q1[0]-p1[0])*(p2[1]-p1[1]) - (q1[1]-p1[1])*(p2[0]-p1[0]))/d;
+				if (a <= 1e-9 || a >= 1-1e-9 || b <= 1e-9 || b >= 1-1e-9) continue;
+				var x = [p1[0]+a*(p2[0]-p1[0]), p1[1]+a*(p2[1]-p1[1])];
+				// The crossing splits the outline in two loops, cut off whichever one is small
+				var inner = [x].concat(pts.slice(i+1, j+1));
+				var outer = [x].concat(pts.slice(j+1), pts.slice(0, i+1));
+				if (area(inner) <= maxarea) pts = pts.slice(0, i+1).concat([x], pts.slice(j+1));
+				else if (area(outer) <= maxarea) pts = [x].concat(pts.slice(i+1, j+1));
+				else continue;
+				found = changed = true;
+			}
+		}
+		if (!found) break;
+	}
+	return changed ? pts : null;
+}
+
+function cam_tidypart(part, set){
+	// Reference outlines to markings, rib end pieces joined to their ribs, tiny loops cut off
+	var cut = [], marks = part.marks.slice();
+	part.cut.forEach(function(sub, i){ (set && set.reference === i ? marks : cut).push(sub); });
+	var tip = null, rib = null;
+	cut.forEach(function(sub){ if (/^flatrib-tip-\d+$/.test(sub.src || "")) tip = sub; else if (/^flatrib-\d+$/.test(sub.src || "")) rib = sub; });
+	if (tip && rib){
+		var joined = cam_joinribtip(rib, tip);
+		if (joined){
+			cut = cut.filter(function(s){ return s !== tip && s !== rib; });
+			cut.unshift(joined.outline);
+			marks.push(joined.neckline);
+		}
+	}
+	cut = cut.map(function(sub){
+		// Straight-line outlines: cut off tiny loops, drop duplicate and straight-through points
+		var pts = cam_linepts(sub);
+		if (!pts) return sub;
+		pts = cam_cleanpoly(cam_removeloops(pts, 1.0) || pts);
+		var out = cam_polyline(pts.concat([pts[0]]), true);
+		out.src = sub.src;
+		return out;
+	});
+	return {name:part.name, cut:cut, marks:marks};
+}
+
 function cam_gatherset(set, root){
 	if (set.key == "body") return cam_bodyoutline(root);
 	var parts = [];
@@ -454,7 +559,7 @@ function cam_gatherset(set, root){
 		var geom = cam_collect(p.el, root);
 		if (p.mirrorjoin) parts = parts.concat(cam_joinmirrored(p.name, geom) || cam_splitparts(p.name, geom));
 		else if (p.split) parts = parts.concat(cam_splitparts(p.name, geom));
-		else if (geom.cut.length) parts.push({name:p.name, cut:geom.cut, marks:geom.marks});
+		else if (geom.cut.length) parts.push(cam_tidypart({name:p.name, cut:geom.cut, marks:geom.marks}, set));
 	});
 	return parts;
 }
