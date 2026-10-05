@@ -49,6 +49,7 @@ var CAMSETS = [
 		return []; // built separately, see cam_bodyoutline
 	}},
 	{key:"flatribs", group:"instrument", label:"Flat rib templates", rotate:true,
+		pair:function(name){ return /^flatribg-\d+$/.test(name) && name != "flatribg-1"; }, // All but the centre rib
 		desc:"Ribs unfolded flat: centre rib C, the numbered ribs and the two end clasp pieces. The rib strips are cut to these.", parts:function(){
 		var out = cam_children("flatribs-layer", /^flatribg-/);
 		var ec = getelid("endclasp-flat-template-group");
@@ -69,7 +70,8 @@ var CAMSETS = [
 		return cam_children("formlayer", /^carved-form-/);
 	}},
 	{key:"crosssupports", group:"carved", label:"Cross supports",
-		desc:"Quarter cross sections standing in the carved form slots: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
+		pair:function(name){ return true; }, // Quarter sections, one per side
+		desc:"Quarter cross sections standing in the carved form slots, one per side: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
 		return cam_children("formlayer", /^(cross-support-|last-support-|necblock-face-|adaptor-face-|helper-face-)/);
 	}},
 	{key:"simpleform", group:"simple", label:"Simple form: bottom and middle",
@@ -482,13 +484,12 @@ function cam_fliphorizontal(part){
 	return cam_transformpart(part, function(p){ return [sum - p[0], p[1]]; });
 }
 
-function cam_ribpairs(parts){
-	// The templates cover half the bowl: add a mirrored copy of every rib except the centre rib
+function cam_pairs(parts, pair){
+	// Parts that cover half the bowl get a mirrored copy for the other side
 	var out = [];
 	parts.forEach(function(p){
 		out.push(p);
-		var m = p.name.match(/^flatribg-(\d+)$/);
-		if (m && m[1] != "1"){
+		if (pair(p.name)){
 			var copy = cam_fliphorizontal(p);
 			copy.name = p.name + "-mirrored";
 			out.push(copy);
@@ -749,7 +750,7 @@ function cam_build(keys, opts){
 			var parts = cam_gatherset(set, root);
 			if (!opts.marks) parts = parts.map(function(p){ return {name:p.name, cut:p.cut, marks:[]}; });
 			if (set.rotate) parts = parts.map(cam_minrotate);
-			if (set.key == "flatribs" && opts.ribpairs) parts = cam_ribpairs(parts);
+			if (set.pair && opts.ribpairs) parts = cam_pairs(parts, set.pair);
 			results.push({key:set.key, label:set.label, group:set.group, desc:set.desc, parts:parts, layout:cam_layout(parts, sheetwidth, gap)});
 		});
 		return results;
@@ -789,6 +790,7 @@ function cam_partlabel(key, name){
 		return name == "endclasp-flat" || name == "endclasp-flat-1" ? "end clasp" : "";
 	}
 	if (key == "ribsupports") return "joint " + name.replace("ribsupportg-", "");
+	if (/-mirrored$/.test(name)) return cam_partlabel(key, name.replace(/-mirrored$/, "")) + " m";
 	return name.replace(/^(supportg-|cross-support-|carved-form-|formblock-|simple-form2?-|simple2?-|cross2-support-)/, "").replace(/-group$/, "");
 }
 
@@ -872,7 +874,7 @@ function cam_opendialog(){
 		html += '<hr><label style="display:block">Files <select id="cam-files">'+
 				'<option value="group" selected>One per group</option><option value="set">One per part set</option><option value="one">All parts in one file</option></select></label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-guide" checked> Include parts guide (HTML)</label>'+
-			'<label style="display:block" title="The rib templates cover half the bowl. Adds a mirrored copy of every rib except the centre rib, labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Rib pairs: mirrored copy of ribs 1 and up</label>'+
+			'<label style="display:block" title="Rib templates and carved mould cross supports cover half the bowl. Adds a mirrored copy of each (all ribs except the centre rib), labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Mirrored pairs: ribs 1 and up, carved cross supports</label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
 			'<label style="display:block">Max layout width <input type="number" id="cam-sheetwidth" value="1200" min="100" step="10" style="width:6em"> mm</label>'+
 			'<label style="display:block">Gap between parts <input type="number" id="cam-gap" value="10" min="0" step="1" style="width:6em"> mm</label>'+
