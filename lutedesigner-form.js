@@ -1376,15 +1376,25 @@ function drawcarvedform(inslices, formlength) {
 	// console.log("fourth_yi",fourth_yi);
 	var fourth_y = getlast(shape[fourth_yi].ribs).y;
 	// console.log("fourth_yi",fourth_yi)
-	var fp = makecross(fourth_y, fourth_yi, "cross-support-",4, origin, true); 
-	markpos(fp, -fourth_y,4,true);
+	// It occupies materialth after fourth_y; on a short body move it back so it does not overlap the widest support
+	var fourth_room = widest_y - 1.5*materialth;
+	if (fourth_y > fourth_room){
+		fourth_y = fourth_room;
+		while (fourth_yi > 1 && shape[fourth_yi-1].ribs[0] && shape[fourth_yi-1].ribs[0].y >= fourth_y) fourth_yi--;
+	}
+	if (fourth_y >= 3*materialth){ // Leave it out if there is no room after the butt supports
+		var fp = makecross(fourth_y, fourth_yi, "cross-support-",4, origin, true); 
+		markpos(fp, -fourth_y,4,true);
+	}
 	
 	
 	//////////////////////////////////////////////////////////////////////////////
 	// Draw the rest of the cross supports
 	var intervals = Math.abs((formlength-widest_y)/wanted_interval);
 	var interval = Math.abs((formlength-widest_y)/intervals); // even mm's
-	for (var i=1; i<intervals; i++){
+	// A main support occupies materialth before its station and the last support the last materialth of the form,
+	// so stop where they would overlap or touch
+	for (var i=1; i<intervals && widest_y+interval*i <= formlength-2*materialth; i++){
 		// TODO: Consider changing this while to for,if too
 		while(shape[last_yi].ribs[0].y < widest_y+interval*i){
 			last_yi +=1;
