@@ -472,7 +472,8 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc,segments){
 		var mp = p1.moveangle(ll, a); // Point between p1 & p2
 		// drawcircle(getelid("frontview"), mp, 2, REDSTYLE);
 		// drawshape(getelid("frontview"),[p1,p2],REDSTYLE);
-		var b = Math.sqrt(radius**2-ll**2);
+		if (radius < ll) console.log("arctobezier: radius smaller than half the chord, using a semicircle", radius, ll);
+		var b = Math.sqrt(Math.max(0, radius**2-ll**2));
 		if (clockwise) {
 			center = mp.moveangle(b, a+Math.PI*0.5);
 		} else {
@@ -486,13 +487,11 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc,segments){
 		
 		if (radius2.toFixed(4) != radius.toFixed(4)) {
 			console.log("arctobezier: radiuses do not match. Using average. ",radius,radius2);
-			radius = radius+radius2/2.0;
+			radius = (radius+radius2)/2.0;
 		}
 	}
 	// var clockwise = clockwise || true;
 	// console.log(clockwise);
-	var cplength = 0.55228474; // cplength*radius if 90deg circle segment
-	var cpangle = 0.3212368916123159; // percentage of angle of circle segment
 	var beziers = [];
 	
 	 
@@ -521,7 +520,7 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc,segments){
 		
 		var ca1 = normangle(center,startp);
 		var ca2 = normangle(center,endp);
-		var cple = radius*Math.tan(cpangle*ang);
+		var cple = radius*4/3*Math.tan(ang/4); // Exact control arm length for a circular arc of angle ang
 		// if (clockwise) {
 			var cp1 = startp.moveangle(cple, ca1+0.5*Math.PI*dir);
 			var cp2 = endp.moveangle(cple, ca2-0.5*Math.PI*dir);
@@ -539,16 +538,17 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc,segments){
 		// console.log("makesegment",ang,ca1,ca2,cple,cp1,cp2);
 		
 	}
-	// Split arc into max 90deg segments
+	// Split arc into equal segments of max 45deg, at least the requested number.
+	// A single cubic deviates 0.027% of radius from a 90deg arc.
 	var dir = 1;
 	// if (!clockwise ) dir = -1; // && largearc ???
-	var incr_a = 0.5*Math.PI;
-	if (incr_a > maxsegangle) incr_a = maxsegangle;
+	var nseg = Math.max(segments, Math.ceil(angledelta/(0.25*Math.PI) - 1e-9));
+	var incr_a = angledelta/nseg;
 	var cur_a = incr_a;
 	var curp = p1;
 	var endp;
 	var seg = 0;
-	while (cur_a < angledelta && seg < segments ){
+	while (cur_a < angledelta - 1e-9 && seg < nseg-1){
 		// Calculate a point along the circle
 		// console.log("in while",cur_a, angledelta);
 		var endp = center.moveangle(radius, a1+cur_a*dir);
