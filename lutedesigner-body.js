@@ -1761,22 +1761,6 @@ function calculateribjoints_plane(Ypoints,sidepoints,midpoints, ribs, widest_i) 
 	// }
 	
 
-	// Synchronize ribpaths based on y coordinates
-	// For each rib joint, find rib joint y coordinate that is Ypoints[widest_i] 
-	var offsets = [];
-	for (var i=0; i<output_real.length; i++){
-		for (var j=0; j<output_real[i].length; j++){
-			if (output_real[i][j].y == Ypoints[widest_i]) break;
-		}
-		offsets.push(j - widest_i);
-	}
-
-	var maxoffset = Math.abs(offsets[findmin(offsets)]);
-
-	for (var i=0; i<offsets.length; i++){
-		offsets[i] = offsets[i]+maxoffset+1;
-	}
-
 	// Sanitize output_real so ribs don't intersect under endclasp
 	// TODO: This may lead to unnecessary culling?
 	
@@ -1813,21 +1797,29 @@ function calculateribjoints_plane(Ypoints,sidepoints,midpoints, ribs, widest_i) 
 		if (inter) {
 			// drawcircle(getelid("crosslayer"), CROSSVIEWORIGIN.minuspoint(inter), 1, REDSTYLE, "rib-inters-"+i+"-"+j+"-"+k);
 			
-			// Delete points from i that have x<inter.x and/or z<inter.y
-			var jr = 0;
-			var removed;
-			while (output_real[i].x < inter.x || output_real[i].z < inter.y  || jr < 20){
-				removed = output_real[i].shift();
-				jr++;
+			// Delete points from the start of rib i that have x<inter.x and/or z<inter.y
+			while (output_real[i].length > 2 && (output_real[i][0].x < inter.x || output_real[i][0].z < inter.y)){
+				output_real[i].shift();
 			}
-			
-			// console.log(new Point(inter.x, removed.y, inter.y));
-			// TODO: successfully removing points from threedee means offsets becomes unreliable. Maybe add null values as padding?
-			// or reverse order and start from tip?
-			// Or simplify start area so that each ribline has a startpoint and the next point is always synchronized, and each ribline has the same number of points?
 			output_real[i].unshift(new Point(inter.x, inter_y, inter.y));
 		}
 	}
+	}
+
+	// Synchronize ribpaths based on y coordinates, after sanitizing since it changes point indices
+	// For each rib joint, find rib joint y coordinate that is Ypoints[widest_i] 
+	var offsets = [];
+	for (var i=0; i<output_real.length; i++){
+		for (var j=0; j<output_real[i].length; j++){
+			if (output_real[i][j].y == Ypoints[widest_i]) break;
+		}
+		offsets.push(j - widest_i);
+	}
+
+	var maxoffset = Math.abs(offsets[findmin(offsets)]);
+
+	for (var i=0; i<offsets.length; i++){
+		offsets[i] = offsets[i]+maxoffset+1;
 	}
 
 	return {/* "sideview":output_draw, */ "threedee":output_real,"soundboard_edge":edge, Ypoints:Ypoints, offsets:offsets, "form_supports":output_supports, "compensations":compensations,"plane":planefunction, "planedata":planedata/* , "deepened":deepened */};
