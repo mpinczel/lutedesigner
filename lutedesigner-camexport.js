@@ -258,8 +258,12 @@ function cam_polyline(pts, closed){
 
 function cam_mapsub(sub, f){
 	// Apply point function f to every point of a subpath
+	// Exact circular arcs (corner relief) keep their centre, so the DXF writer can tell them from other curves
 	return {start:f(sub.start), closed:sub.closed, segs:sub.segs.map(function(s){
-		return s.t == "C" ? {t:"C", c1:f(s.c1), c2:f(s.c2), p:f(s.p)} : {t:"L", p:f(s.p)};
+		if (s.t != "C") return {t:"L", p:f(s.p)};
+		var o = {t:"C", c1:f(s.c1), c2:f(s.c2), p:f(s.p)};
+		if (s.arc) o.arc = {c:f(s.arc.c)};
+		return o;
 	})};
 }
 
@@ -274,7 +278,7 @@ function cam_reversesub(sub){
 	var segs = [];
 	for (var i=sub.segs.length-1; i>=0; i--){
 		var s = sub.segs[i];
-		segs.push(s.t == "C" ? {t:"C", c1:s.c2, c2:s.c1, p:pts[i]} : {t:"L", p:pts[i]});
+		segs.push(s.t == "C" ? {t:"C", c1:s.c2, c2:s.c1, p:pts[i], arc:s.arc} : {t:"L", p:pts[i]});
 	}
 	return {start:pts[pts.length-1], closed:sub.closed, segs:segs};
 }
@@ -690,6 +694,174 @@ function cam_tidypart(part, set){
 	return {name:part.name, cut:cut, marks:marks};
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Router corner relief: a router bit leaves its radius in inside corners, so a square
+// edge of the mating part would not seat in a notch, mortise or against a tenon shoulder.
+// Square inside corners of mould parts get a dog-bone (or a T-bone where there is no room).
+///////////////////////////////////////////////////////////////////////////////
+
+function cam_flatpts(sub){
+	// Points of a subpath with curves sampled, for orientation and containment tests
+	var pts = [sub.start], cur = sub.start;
+	sub.segs.forEach(function(s){
+		if (s.t == "C"){ for (var k=1; k<=8; k++) pts.push(cam_cubicpt([cur, s.c1, s.c2, s.p], k/8)); }
+		else pts.push(s.p);
+		cur = s.p;
+	});
+	return pts;
+}
+
+function cam_signedarea(pts){
+	var a = 0;
+	for (var i=0; i<pts.length; i++){ var u = pts[i], v = pts[(i+1)%pts.length]; a += u[0]*v[1]-v[0]*u[1]; }
+	return a/2;
+}
+
+function cam_arcsegs(c, r, a0, a1){
+	// Circular arc around c from angle a0 to a1 as cubic segments of at most 90 degrees
+	var n = Math.max(1, Math.ceil(Math.abs(a1-a0)/(Math.PI/2))), d = (a1-a0)/n, k = 4/3*Math.tan(d/4), out = [];
+	var pt = function(a){ return [c[0]+r*Math.cos(a), c[1]+r*Math.sin(a)]; };
+	var tan = function(a){ return [-r*Math.sin(a), r*Math.cos(a)]; };
+	for (var i=0; i<n; i++){
+		var ta = a0+i*d, tb = ta+d, p0 = pt(ta), p1 = pt(tb), t0 = tan(ta), t1 = tan(tb);
+		out.push({t:"C", c1:[p0[0]+k*t0[0], p0[1]+k*t0[1]], c2:[p1[0]-k*t1[0], p1[1]-k*t1[1]], p:p1, arc:{c:c}});
+	}
+	return out;
+}
+
+function cam_arcthrough(c, r, from, via, to){
+	// Arc around c from point from, through via, to point to (each half less than 180 degrees)
+	var ang = function(p){ return Math.atan2(p[1]-c[1], p[0]-c[0]); };
+	var norm = function(a){ while (a > Math.PI) a -= 2*Math.PI; while (a <= -Math.PI) a += 2*Math.PI; return a; };
+	var a0 = ang(from), d1 = norm(ang(via)-a0), d2 = norm(ang(to)-ang(via));
+	var segs = cam_arcsegs(c, r, a0, a0+d1).concat(cam_arcsegs(c, r, a0+d1, a0+d1+d2));
+	segs[segs.length-1].p = to; // end exactly on the edge
+	return segs;
+}
+
+function cam_relief(part, diameter){
+	// Returns {part, dog, tbone, skipped}; only square (90 +-15 degrees) inside corners between straight edges change.
+	// Each corner tries a dog-bone, then a T-bone into either wall; a choice whose arc would cross other
+	// geometry of the part (e.g. across a narrow tooth between two notches) falls back to the next one.
+	var R = diameter/2 + 0.1; // a little over the bit radius so the bit clears the corner point
+	var flats = part.cut.map(cam_flatpts);
+	var outlines = part.cut.map(function(sub, si){
+		// Normalise to a list of segments ending back at the start
+		var segs = sub.segs.slice(), last = segs[segs.length-1].p;
+		if (cam_vlen(cam_vsub(last, sub.start)) > 1e-6) segs.push({t:"L", p:sub.start});
+		var n = segs.length, P = function(k){ return segs[(k+n)%n].p; }; // P(k) = end of segment k = start of segment k+1
+		var start = function(k){ return P(k-1); };
+		// Material is inside the outline, or outside it for a hole inside another outline of the part
+		var hole = flats.some(function(f, fi){ return fi != si && cam_ptinpoly(flats[si][0], f); });
+		var orient = (cam_signedarea(flats[si]) > 0 ? 1 : -1) * (hole ? -1 : 1);
+		var len = segs.map(function(sg, k){ return sg.t == "L" ? cam_vlen(cam_vsub(sg.p, start(k))) : 0; });
+		var corners = [];
+		for (var k=0; k<n; k++){
+			var kout = (k+1)%n;
+			if (segs[k].t != "L" || segs[kout].t != "L") continue;
+			var p = P(k), d1 = cam_vunit(cam_vsub(start(k), p)), d2 = cam_vunit(cam_vsub(P(k+1), p));
+			if (!d1 || !d2) continue;
+			if (cam_vcross(cam_vsub(p, start(k)), cam_vsub(P(k+1), p))*orient >= 0) continue; // convex corner
+			var th = Math.acos(Math.max(-1, Math.min(1, cam_vdot(d1, d2))));
+			if (Math.abs(th - Math.PI/2) > 15*Math.PI/180) continue;
+			var u = cam_vunit([d1[0]+d2[0], d1[1]+d2[1]]), t = 2*R*cam_vdot(d1, u), opts = [];
+			// Dog-bone: circle through the corner, centred on the bisector
+			var c = [p[0]+R*u[0], p[1]+R*u[1]], a = [p[0]+t*d1[0], p[1]+t*d1[1]], b = [p[0]+t*d2[0], p[1]+t*d2[1]];
+			opts.push({kind:"dog", use:[[k, t], [kout, t]], a:a, b:b, segs:cam_arcthrough(c, R, a, p, b)});
+			// T-bones: semicircle into one wall, the bit reaches the corner along the other edge. Longer wall first.
+			(len[k] >= len[kout] ? ["in", "out"] : ["out", "in"]).forEach(function(wall){
+				var dw = wall == "in" ? d1 : d2, dother = wall == "in" ? d2 : d1, kw = wall == "in" ? k : kout;
+				var c = [p[0]+R*dw[0], p[1]+R*dw[1]], q = [p[0]+2*R*dw[0], p[1]+2*R*dw[1]];
+				var via = [c[0]-R*dother[0], c[1]-R*dother[1]]; // bulges away from the open side
+				opts.push(wall == "in" ? {kind:"tbone", use:[[kw, 2*R]], a:q, b:p, segs:cam_arcthrough(c, R, q, via, p)} :
+										 {kind:"tbone", use:[[kw, 2*R]], a:p, b:q, segs:cam_arcthrough(c, R, p, via, q)});
+			});
+			corners.push({k:k, p:p, opts:opts, from:0, chosen:-1});
+		}
+		return {sub:sub, segs:segs, n:n, len:len, corners:corners};
+	});
+	var assign = function(o){
+		// Choose for each corner the first option from its current start that fits the edge lengths left
+		var remain = o.len.slice();
+		o.corners.forEach(function(cn){
+			cn.chosen = -1;
+			for (var i=cn.from; i<cn.opts.length; i++){
+				var op = cn.opts[i];
+				if (op.use.every(function(e){ return remain[e[0]] >= e[1] + 0.01; })){
+					op.use.forEach(function(e){ remain[e[0]] -= e[1]; });
+					cn.chosen = i;
+					break;
+				}
+			}
+		});
+	};
+	var build = function(o){
+		// Rebuild: each straight segment runs from its start relief end to its end relief start; tags name the corner
+		var relief = {};
+		o.corners.forEach(function(cn, ci){ if (cn.chosen >= 0) relief[cn.k] = {op:cn.opts[cn.chosen], ci:ci}; });
+		if (!Object.keys(relief).length) return {sub:o.sub, tags:null};
+		var vstart = relief[o.n-1] ? relief[o.n-1].op.b : o.sub.start, out = [], tags = [];
+		for (var k=0; k<o.n; k++){
+			if (relief[k]){
+				var r = relief[k];
+				out.push({t:"L", p:r.op.a}); tags.push(r.ci); // the trimmed edge stays straight, tagged so a crossing there downgrades too
+				r.op.segs.forEach(function(sg){ out.push(sg); tags.push(r.ci); });
+			} else { out.push(o.segs[k]); tags.push(-1); }
+		}
+		return {sub:{start:vstart, segs:out, closed:true, src:o.sub.src}, tags:tags};
+	};
+	var pieces = function(b){
+		// Flattened edges of a built outline, each with the corner tag of the segment it came from
+		var res = [], cur = b.sub.start;
+		b.sub.segs.forEach(function(sg, i){
+			var tag = b.tags ? b.tags[i] : -1;
+			if (sg.t == "C"){ var prev = cur; for (var k=1; k<=8; k++){ var q = cam_cubicpt([cur, sg.c1, sg.c2, sg.p], k/8); res.push([prev, q, tag]); prev = q; } }
+			else res.push([cur, sg.p, tag]);
+			cur = sg.p;
+		});
+		return res;
+	};
+	var crossing = function(e, f){
+		var p1 = e[0], p2 = e[1], q1 = f[0], q2 = f[1];
+		var d = (p2[0]-p1[0])*(q2[1]-q1[1]) - (p2[1]-p1[1])*(q2[0]-q1[0]);
+		if (Math.abs(d) < 1e-12) return false;
+		var a = ((q1[0]-p1[0])*(q2[1]-q1[1]) - (q1[1]-p1[1])*(q2[0]-q1[0]))/d, b = ((q1[0]-p1[0])*(p2[1]-p1[1]) - (q1[1]-p1[1])*(p2[0]-p1[0]))/d;
+		return a > 1e-9 && a < 1-1e-9 && b > 1e-9 && b < 1-1e-9;
+	};
+	outlines.forEach(assign);
+	for (var iter=0; iter<200; iter++){
+		var built = outlines.map(build), E = [];
+		built.forEach(function(b, oi){ pieces(b).forEach(function(e, i, arr){ E.push({e:e, oi:oi, i:i, n:arr.length}); }); });
+		// Find crossings that involve a relief; neighbouring edges of one outline share a point and do not count
+		var bad = [];
+		for (var x=0; x<E.length; x++){
+			var ex = E[x], bx = [Math.min(ex.e[0][0], ex.e[1][0]), Math.min(ex.e[0][1], ex.e[1][1]), Math.max(ex.e[0][0], ex.e[1][0]), Math.max(ex.e[0][1], ex.e[1][1])];
+			for (var y=x+1; y<E.length; y++){
+				var ey = E[y];
+				if (ex.e[2] < 0 && ey.e[2] < 0) continue;
+				if (ex.oi == ey.oi && (ey.i-ex.i == 1 || (ex.i == 0 && ey.i == ey.n-1))) continue;
+				if (Math.max(ey.e[0][0], ey.e[1][0]) < bx[0] || Math.min(ey.e[0][0], ey.e[1][0]) > bx[2] ||
+					Math.max(ey.e[0][1], ey.e[1][1]) < bx[1] || Math.min(ey.e[0][1], ey.e[1][1]) > bx[3]) continue;
+				if (crossing(ex.e, ey.e)){
+					if (ex.e[2] >= 0) bad.push([ex.oi, ex.e[2]]);
+					if (ey.e[2] >= 0) bad.push([ey.oi, ey.e[2]]);
+				}
+			}
+		}
+		if (!bad.length) break;
+		bad.forEach(function(b){ var cn = outlines[b[0]].corners[b[1]]; if (cn.chosen >= 0) cn.from = cn.chosen + 1; });
+		outlines.forEach(assign);
+	}
+	var stats = {dog:0, tbone:0, skipped:[]};
+	outlines.forEach(function(o){ o.corners.forEach(function(cn){
+		if (cn.chosen < 0) stats.skipped.push(cn.p);
+		else if (cn.opts[cn.chosen].kind == "dog") stats.dog++;
+		else stats.tbone++;
+	}); });
+	var cut = outlines.map(function(o){ return build(o).sub; });
+	return {part:{name:part.name, cut:cut, marks:part.marks}, dog:stats.dog, tbone:stats.tbone, skipped:stats.skipped};
+}
+
 function cam_gatherset(set, root){
 	if (set.key == "body") return cam_bodyoutline(root);
 	var parts = [];
@@ -925,7 +1097,9 @@ function cam_dxfpolyline(sub, layer, tol, arcs){
 	// One subpath as POLYLINE with VERTEX bulges
 	var verts = [{p:sub.start, b:0}], cur = sub.start;
 	sub.segs.forEach(function(s){
-		var pieces = s.t == "C" ? cam_fitcubic([cur, s.c1, s.c2, s.p], tol, arcs, 0) : [{p:s.p, b:0}];
+		// Corner relief arcs are only a little larger than the bit, and CAM offsets of such small arcs can fail
+		// (Alphacam drops the whole profile), so they are written as fine straight segments
+		var pieces = s.t == "C" ? (s.arc ? cam_fitcubic([cur, s.c1, s.c2, s.p], Math.min(tol, 0.005), false, 0) : cam_fitcubic([cur, s.c1, s.c2, s.p], tol, arcs, 0)) : [{p:s.p, b:0}];
 		pieces.forEach(function(pc){
 			verts[verts.length-1].b = pc.b; // bulge belongs to the segment starting at the previous vertex
 			verts.push({p:pc.p, b:0});
@@ -1005,11 +1179,22 @@ function cam_build(keys, opts){
 		var results = [];
 		CAMSETS.forEach(function(set){
 			if (keys.indexOf(set.key) < 0) return;
-			var parts = cam_gatherset(set, root);
+			var parts = cam_gatherset(set, root), relief = null;
+			// Mould parts fit together, so their square inside corners get relief for the router bit.
+			// The foam-core mould is 3.8 mm plywood with narrow notches, cut with a smaller bit than the board moulds.
+			var dia = set.group == "instrument" || set.group == "templates" ? 0 : set.group == "foamcore" ? opts.reliefthin : opts.relief;
+			if (dia){
+				relief = {diameter:dia, dog:0, tbone:0, skipped:0};
+				parts = parts.map(function(p){
+					var r = cam_relief(p, dia);
+					relief.dog += r.dog; relief.tbone += r.tbone; relief.skipped += r.skipped.length;
+					return r.part;
+				});
+			}
 			if (!opts.marks) parts = parts.map(function(p){ return {name:p.name, cut:p.cut, marks:[]}; });
 			if (set.rotate) parts = parts.map(cam_minrotate);
 			if (set.pair && opts.ribpairs) parts = cam_pairs(parts, set.pair);
-			results.push({key:set.key, label:set.label, group:set.group, desc:set.desc, parts:parts, layout:cam_layout(parts, sheetwidth, gap)});
+			results.push({key:set.key, label:set.label, group:set.group, desc:set.desc, parts:parts, relief:relief, layout:cam_layout(parts, sheetwidth, gap)});
 		});
 		return results;
 	});
@@ -1076,7 +1261,9 @@ function cam_guide(results){
 			html += '<div style="background:#fff;border:1px solid #ccc;border-left:6px solid '+col+';margin:6px 10px;padding:6px 8px">'+
 				'<div style="font-size:14px"><b>'+r.label+'</b> <span style="color:#666">- '+r.parts.length+' part'+(r.parts.length > 1 ? 's' : '')+
 				', DXF layers <code>'+r.key.toUpperCase()+'_CUT</code> / <code>'+r.key.toUpperCase()+'_MARK</code></span></div>'+
-				'<div style="font-size:12px;margin:2px 0 4px">'+r.desc+'</div>'+
+				'<div style="font-size:12px;margin:2px 0 4px">'+r.desc+(r.relief && (r.relief.dog || r.relief.tbone || r.relief.skipped) ?
+					' Corner relief for a '+r.relief.diameter+' mm bit: '+r.relief.dog+' dog-bones, '+r.relief.tbone+' T-bones'+
+					(r.relief.skipped ? ', <b>'+r.relief.skipped+' inside corners too tight for the bit</b>' : '')+'.' : '')+'</div>'+
 				'<svg width="'+W+'" height="'+(L.height*s+32).toFixed(0)+'" font-family="sans-serif" style="max-width:100%;height:auto">'+svg+'</svg></div>';
 		});
 	});
@@ -1134,6 +1321,9 @@ function cam_opendialog(){
 			'<label style="display:block"><input type="checkbox" id="cam-guide" checked> Include parts guide (HTML)</label>'+
 			'<label style="display:block" title="Rib templates, rib supports and carved mould cross supports cover half the bowl. Adds a mirrored copy of each (all ribs except the centre rib), labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Mirrored pairs: ribs 1 and up, rib supports, carved cross supports</label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
+			'<label style="display:block" title="A router bit leaves its radius in inside corners, so the square edge of the mating part would not seat. Square inside corners of mould parts get a dog-bone, or a T-bone where there is no room. Set the diameter of the bit that cuts the parts."><input type="checkbox" id="cam-relief" checked> Router corner relief on mould joints, bit diameter</label>'+
+			'<label style="display:block;margin-left:1.5em">board moulds <input type="number" id="cam-reliefdia" value="6" min="0.5" step="0.5" style="width:4em"> mm, '+
+				'foam-core plywood <input type="number" id="cam-reliefdia-thin" value="2" min="0.5" step="0.5" style="width:4em" title="The foam-core notches are 3.8 mm wide, so the bit must be smaller than that"> mm</label>'+
 			'<label style="display:block">Max layout width <input type="number" id="cam-sheetwidth" value="1200" min="100" step="10" style="width:6em"> mm</label>'+
 			'<label style="display:block">Gap between parts <input type="number" id="cam-gap" value="10" min="0" step="1" style="width:6em"> mm</label>'+
 			'<hr><label style="display:block">Format <select id="cam-format">'+
@@ -1163,10 +1353,14 @@ function cam_exportselected(){
 	var results = cam_build(keys, {
 		marks: getelid("cam-marks").checked,
 		ribpairs: getelid("cam-ribpairs").checked,
+		relief: getelid("cam-relief").checked ? parseFloat(getelid("cam-reliefdia").value) || 0 : 0,
+		reliefthin: getelid("cam-relief").checked ? parseFloat(getelid("cam-reliefdia-thin").value) || 0 : 0,
 		sheetwidth: parseFloat(getelid("cam-sheetwidth").value),
 		gap: parseFloat(getelid("cam-gap").value)
 	}).filter(function(r){ return r.parts.length; });
-	var status = results.map(function(r){ return r.label+": "+r.parts.length; }).join(", ");
+	var status = results.map(function(r){
+		return r.label+": "+r.parts.length+(r.relief && r.relief.skipped ? " ("+r.relief.skipped+" inside corners too tight for the bit)" : "");
+	}).join(", ");
 	var format = getelid("cam-format").value;
 	var dxfopts = {arcs: getelid("cam-dxfcurves").value == "arcs", tolerance: parseFloat(getelid("cam-tolerance").value) || 0.01};
 	var files = []; // [filename, content]
@@ -1189,6 +1383,8 @@ function cam_exportselected(){
 	if (getelid("cam-guide").checked && results.length){
 		// The guide always shows markings, so build it separately when they are switched off
 		var guideresults = getelid("cam-marks").checked ? results : cam_build(keys, {marks:true, ribpairs: getelid("cam-ribpairs").checked,
+			relief: getelid("cam-relief").checked ? parseFloat(getelid("cam-reliefdia").value) || 0 : 0,
+			reliefthin: getelid("cam-relief").checked ? parseFloat(getelid("cam-reliefdia-thin").value) || 0 : 0,
 			sheetwidth: parseFloat(getelid("cam-sheetwidth").value), gap: parseFloat(getelid("cam-gap").value)}).filter(function(r){ return r.parts.length; });
 		files.push([cam_filename("cam_guide", "html"), cam_guide(guideresults)]);
 	}
