@@ -40,6 +40,12 @@ var CAMGROUPS = [
 		desc:"For checking and hand shaping, not mould parts."}
 ];
 
+// Rectangles the mould drawings put on the bottom and middle boards where the middle board and cross supports meet them.
+// In the carved mould the parts stand on the boards, so these only mark the places. In the simple moulds the parts
+// reach into the boards (mortises in the bottom, notches in the middle board), so these are cut out.
+var CAM_POSITIONMARK = /(middle-position|cross-support-foot-[lr]-\d+|cross-support-shoulder-\d+)$/;
+var CAM_JOINT = CAM_POSITIONMARK;
+
 // Part sets offered in the export dialog, in group order.
 // parts() runs while the form drawing is shown and returns [{name, el, split}]
 // split: every closed outline in el becomes its own part
@@ -67,17 +73,19 @@ var CAMSETS = [
 		return cam_children("formlayer", /^(supportg-|formblock-)/);
 	}},
 	{key:"carvedform", group:"carved", label:"Carved form: bottom and middle",
-		desc:"Bottom board (body outline with centre strip) and middle profile board, with slots for the cross supports.", parts:function(){
+		marks:CAM_POSITIONMARK, // The cross supports stand on the boards, the rectangles only show where
+		desc:"Bottom board (body outline) and middle profile board. The cross supports stand on them, their places are marked.", parts:function(){
 		return cam_children("formlayer", /^carved-form-/);
 	}},
 	{key:"crosssupports", group:"carved", label:"Cross supports",
 		pair:function(name){ return true; }, // Quarter sections, one per side
 		reference:1, // Second outline is the cross section of the rest of the mould, drawn for reference
-		desc:"Quarter cross sections standing in the carved form slots, one per side: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
+		desc:"Quarter cross sections, one per side, standing on the bottom board against the middle board at their marked places: butt 1-3 at the tail, widest point, main stations, last support and neck block face. Wide necks (90 mm and more) add adaptor and helper faces.", parts:function(){
 		return cam_children("formlayer", /^(cross-support-|last-support-|necblock-face-|adaptor-face-|helper-face-)/);
 	}},
 	{key:"simpleform", group:"simple", label:"Simple form: bottom and middle",
-		desc:"Bottom and middle boards of the simple mould.", parts:function(){
+		slots:CAM_JOINT, // The middle board and cross support go through or into the boards here
+		desc:"Bottom and middle boards of the simple mould, with the mortises and notches for the middle board and cross support.", parts:function(){
 		return cam_children("formlayer", /^simple-form-/);
 	}},
 	{key:"simplecross", group:"simple", label:"Simple form cross supports",
@@ -85,7 +93,8 @@ var CAMSETS = [
 		return cam_children("formlayer", /^simple-(cross-support|neckblock-face)-/);
 	}},
 	{key:"simple2form", group:"simple2", label:"Simple form 2: bottom and middle",
-		desc:"Bottom and middle boards of the second simple mould.", parts:function(){
+		slots:CAM_JOINT,
+		desc:"Bottom and middle boards of the second simple mould, with the mortises and notches for the middle board and cross supports.", parts:function(){
 		return cam_children("formlayer", /^simple-form2-/);
 	}},
 	{key:"simple2cross", group:"simple2", label:"Simple form 2 cross supports",
@@ -450,8 +459,11 @@ function cam_splitparts(name, geom){
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Tidying parts for cutting: reference outlines and rib end pieces
+// Tidying parts for cutting: position marks, rib end pieces and edge slots
 ///////////////////////////////////////////////////////////////////////////////
+
+// Notches the app draws as separate rectangles over a part's edge, in every set
+var CAM_SLOT = /slot\d*$/;
 
 function cam_linepts(sub){
 	// Points of a straight-line subpath without the closing duplicate, or null if it has curves
@@ -460,6 +472,30 @@ function cam_linepts(sub){
 	var last = pts[pts.length-1];
 	if (Math.hypot(last[0]-pts[0][0], last[1]-pts[0][1]) < 1e-6) pts.pop();
 	return pts;
+}
+
+function cam_ptinpoly(p, pts){
+	var c = false;
+	for (var i=0, j=pts.length-1; i<pts.length; j=i++){
+		if (((pts[i][1] > p[1]) != (pts[j][1] > p[1])) &&
+			(p[0] < (pts[j][0]-pts[i][0])*(p[1]-pts[i][1])/(pts[j][1]-pts[i][1]) + pts[i][0])) c = !c;
+	}
+	return c;
+}
+
+function cam_polydiff(S, C){ return cam_polyclip(S, C, "diff"); }
+function cam_polyunion(S, C){ return cam_polyclip(S, C, "union"); }
+
+function cam_polyclip(S, C, op){
+	// Boolean of two polygons, retried with the clip polygon nudged by a fraction of a micron when an edge
+	// runs exactly through a vertex (e.g. a notch edge at the same station as a profile point)
+	var nudges = [[0,0], [1e-4,2e-4], [-2e-4,1e-4], [1.5e-4,-1e-4], [-1e-4,-2e-4]];
+	for (var i=0; i<nudges.length; i++){
+		var d = nudges[i], Cn = C.map(function(p){ return [p[0]+d[0], p[1]+d[1]]; });
+		var r = cam_ghclip(S, Cn, op);
+		if (r !== "degenerate") return r && r.map(cam_cleanpoly);
+	}
+	return null;
 }
 
 function cam_cleanpoly(pts){
@@ -474,6 +510,78 @@ function cam_cleanpoly(pts){
 		else i++;
 	}
 	return out;
+}
+
+function cam_ghclip(S, C, op){
+	// Greiner-Hormann: S minus C ("diff") or S union C ("union") of straight edged polygons.
+	// Returns an array of polygons, null when C is a hole inside S (the caller keeps it as its own outline),
+	// or "degenerate" when an edge runs through a vertex.
+	var mk = function(pts){
+		var nodes = pts.map(function(p){ return {p:p, inter:false, entry:false, neighbor:null, visited:false, alpha:0}; });
+		return nodes;
+	};
+	var s = mk(S), c = mk(C), sins = S.map(function(){ return []; }), cins = C.map(function(){ return []; });
+	var count = 0;
+	for (var i=0; i<S.length; i++){
+		var p1 = S[i], p2 = S[(i+1)%S.length];
+		for (var j=0; j<C.length; j++){
+			var q1 = C[j], q2 = C[(j+1)%C.length];
+			var d = (p2[0]-p1[0])*(q2[1]-q1[1]) - (p2[1]-p1[1])*(q2[0]-q1[0]);
+			if (Math.abs(d) < 1e-12) continue; // parallel
+			var a = ((q1[0]-p1[0])*(q2[1]-q1[1]) - (q1[1]-p1[1])*(q2[0]-q1[0]))/d;
+			var b = ((q1[0]-p1[0])*(p2[1]-p1[1]) - (q1[1]-p1[1])*(p2[0]-p1[0]))/d;
+			var eps = 1e-9;
+			if (a < -eps || a > 1+eps || b < -eps || b > 1+eps) continue;
+			if (a < eps || a > 1-eps || b < eps || b > 1-eps) return "degenerate"; // crossing through a vertex
+			var pt = [p1[0]+a*(p2[0]-p1[0]), p1[1]+a*(p2[1]-p1[1])];
+			var ns = {p:pt, inter:true, entry:false, neighbor:null, visited:false, alpha:a};
+			var nc = {p:pt, inter:true, entry:false, neighbor:ns, visited:false, alpha:b};
+			ns.neighbor = nc;
+			sins[i].push(ns); cins[j].push(nc);
+			count++;
+		}
+	}
+	if (count == 0){
+		if (op == "union"){
+			if (cam_ptinpoly(S[0], C)) return [C];
+			if (cam_ptinpoly(C[0], S)) return [S];
+			return [S, C];
+		}
+		if (cam_ptinpoly(S[0], C)) return []; // S completely inside C
+		if (cam_ptinpoly(C[0], S)) return null; // C is a hole in S, keep it as its own outline
+		return [S];
+	}
+	var build = function(nodes, ins){
+		var list = [];
+		for (var i=0; i<nodes.length; i++){
+			list.push(nodes[i]);
+			ins[i].sort(function(x, y){ return x.alpha - y.alpha; }).forEach(function(n){ list.push(n); });
+		}
+		for (var i=0; i<list.length; i++){ list[i].next = list[(i+1)%list.length]; list[i].prev = list[(i-1+list.length)%list.length]; }
+		return list;
+	};
+	var sl = build(s, sins), cl = build(c, cins);
+	// Entry flags: inverted for the subject gives S minus C, inverted for both gives the union
+	var inside = cam_ptinpoly(S[0], C);
+	sl.forEach(function(n){ if (n.inter){ n.entry = inside; inside = !inside; } });
+	inside = cam_ptinpoly(C[0], S);
+	cl.forEach(function(n){ if (n.inter){ n.entry = op == "union" ? inside : !inside; inside = !inside; } });
+	var result = [];
+	for (var k=0; k<sl.length; k++){
+		var start = sl[k];
+		if (!start.inter || start.visited) continue;
+		var poly = [start.p], cur = start, guard = 0;
+		do {
+			cur.visited = true; cur.neighbor.visited = true;
+			if (cur.entry){ do { cur = cur.next; poly.push(cur.p); } while (!cur.inter); }
+			else { do { cur = cur.prev; poly.push(cur.p); } while (!cur.inter); }
+			cur = cur.neighbor;
+			if (++guard > 10000) return "degenerate";
+		} while (!cur.visited);
+		poly.pop(); // last point equals the first
+		result.push(poly);
+	}
+	return result;
 }
 
 function cam_joinribtip(rib, tip){
@@ -527,9 +635,10 @@ function cam_removeloops(pts, maxarea){
 }
 
 function cam_tidypart(part, set){
-	// Reference outlines to markings, rib end pieces joined to their ribs, tiny loops cut off
+	// Position marks to markings, rib end pieces joined to their ribs, edge slots cut out of the part
 	var cut = [], marks = part.marks.slice();
-	part.cut.forEach(function(sub, i){ (set && set.reference === i ? marks : cut).push(sub); });
+	var markre = set && set.marks, slotre = set && set.slots;
+	part.cut.forEach(function(sub, i){ ((markre && markre.test(sub.src || "")) || (set && set.reference === i) ? marks : cut).push(sub); });
 	var tip = null, rib = null;
 	cut.forEach(function(sub){ if (/^flatrib-tip-\d+$/.test(sub.src || "")) tip = sub; else if (/^flatrib-\d+$/.test(sub.src || "")) rib = sub; });
 	if (tip && rib){
@@ -539,6 +648,35 @@ function cam_tidypart(part, set){
 			cut.unshift(joined.outline);
 			marks.push(joined.neckline);
 		}
+	}
+	var slots = cut.filter(function(s){ return CAM_SLOT.test(s.src || "") || (slotre && slotre.test(s.src || "")); });
+	if (slots.length){
+		var others = cut.filter(function(s){ return slots.indexOf(s) < 0; });
+		var area = function(s){ var b = cam_bbox([s]); return (b.x1-b.x0)*(b.y1-b.y0); };
+		var main = others.reduce(function(m, s){ return !m || area(s) > area(m) ? s : m; }, null);
+		var mp = main ? cam_linepts(main) : null;
+		var keep = [];
+		slots.forEach(function(slot){
+			var sp = cam_linepts(slot), res = (mp && sp) ? cam_polydiff(mp, sp) : null;
+			if (res && res.length == 1){ mp = res[0]; } else keep.push(slot); // Slots inside the part stay as cut-outs
+		});
+		if (main && mp){
+			others[others.indexOf(main)] = cam_polyline(mp.concat([mp[0]]), true);
+		}
+		// Mortises that cross each other (e.g. where the middle board and a cross support meet) become one hole
+		var holes = keep.map(function(s){ return {pts:cam_linepts(s), sub:s}; });
+		for (var i=0; i<holes.length; i++){
+			for (var j=i+1; j<holes.length; j++){
+				if (!holes[i].pts || !holes[j].pts) continue;
+				var u = cam_polyunion(holes[i].pts, holes[j].pts);
+				if (u && u.length == 1){
+					holes[i] = {pts:u[0], sub:cam_polyline(u[0].concat([u[0][0]]), true)};
+					holes.splice(j, 1);
+					j = i;
+				}
+			}
+		}
+		cut = others.concat(holes.map(function(h){ return h.sub; }));
 	}
 	cut = cut.map(function(sub){
 		// Straight-line outlines: cut off tiny loops, drop duplicate and straight-through points
