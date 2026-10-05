@@ -105,7 +105,8 @@ var CAMSETS = [
 		desc:"Cross section at the widest point, neck block joint outline and neck block side template, for checking and hand shaping.", parts:function(){
 		return ["cross-section", "neckblock-side-template", "neckblock-group"]
 			.filter(function(id){ return getelid(id); })
-			.map(function(id){ return {name:id, el:getelid(id)}; });
+			// The neck block group is three templates drawn edge to edge (joint face, bottom, back side): cut them apart
+			.map(function(id){ return {name:id, el:getelid(id), split:id == "neckblock-group"}; });
 	}}
 	// Pegbox left out: "detached-pegbox" is an assembly view, its outlines are not cutting profiles
 ];
