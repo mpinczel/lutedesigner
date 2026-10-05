@@ -330,16 +330,30 @@ function cam_elementsubs(el){
 	return [];
 }
 
+function cam_ctm(el, root){
+	// Transform from el's coordinates to root's user coordinates, composed from the transform attributes.
+	// Not getScreenCTM: that depends on the current zoom and can be stale right after a redraw.
+	var m = [1, 0, 0, 1, 0, 0];
+	for (var n=el; n && n!==root; n=n.parentElement){
+		var t = n.transform && n.transform.baseVal.consolidate();
+		if (t){
+			var a = t.matrix;
+			m = [a.a*m[0] + a.c*m[1], a.b*m[0] + a.d*m[1], a.a*m[2] + a.c*m[3], a.b*m[2] + a.d*m[3],
+				 a.a*m[4] + a.c*m[5] + a.e, a.b*m[4] + a.d*m[5] + a.f];
+		}
+	}
+	return m;
+}
+
 function cam_collect(el, root){
 	// Returns {cut:[subpaths], marks:[subpaths]} of el in root user coordinates (mm)
 	var out = {cut:[], marks:[]};
-	var rootinv = root.getScreenCTM().inverse();
 	var shapes = [el].concat(Array.prototype.slice.call(el.querySelectorAll("*")));
 	shapes.forEach(function(s){
 		if (!/^(path|line|rect|circle|ellipse|polyline|polygon)$/i.test(s.tagName)) return;
 		if (!cam_isvisible(s, root) || cam_isdebug(s) || cam_isinvisible(s)) return;
-		var m = rootinv.multiply(s.getScreenCTM());
-		var f = function(p){ return [m.a*p[0] + m.c*p[1] + m.e, m.b*p[0] + m.d*p[1] + m.f]; };
+		var m = cam_ctm(s, root);
+		var f = function(p){ return [m[0]*p[0] + m[2]*p[1] + m[4], m[1]*p[0] + m[3]*p[1] + m[5]]; };
 		cam_elementsubs(s).forEach(function(sub){
 			if (!sub.segs.length) return;
 			var t = cam_mapsub(sub, f);
