@@ -408,9 +408,19 @@ function loadassets(){
 
 function populateeditor(){
 	// Populate editor with loaded assets, and with backed up values
-	// Remove all data from editor, since presets may not contain all fields
-	for (el in document.getElementById("designer-control-panel").getElementsByTagName("input")){
-		el.value = undefined;
+	// Reset the editor to its default values, since presets may not contain all fields
+	var controls = document.getElementById("designer-control-panel").querySelectorAll("input, select");
+	for (var i=0; i<controls.length; i++){
+		var c = controls[i];
+		if (c.tagName == "SELECT"){
+			var def = 0; // Like the browser, use the first option if none is marked selected
+			for (var j=0; j<c.options.length; j++) if (c.options[j].defaultSelected) def = j;
+			c.selectedIndex = c.options.length ? def : -1;
+		} else if (c.type == "checkbox" || c.type == "radio"){
+			c.checked = c.defaultChecked;
+		} else if (c.type != "file" && c.type != "button" && c.type != "submit"){
+			c.value = c.defaultValue;
+		}
 	}
 	// Instrument preset selection
 	var ipreset = getelid("instrumentpreset");
@@ -451,7 +461,21 @@ function populateeditor(){
 					getelid(targets[i]).checked = false;
 				}
 			} else {
-				getelid(targets[i]).value = editorstate[targets[i]];
+				var field = getelid(targets[i]);
+				if (field.tagName == "SELECT" && editorstate[targets[i]] !== undefined){
+					// Add values the list doesn't offer, so the field never shows blank or a different value
+					var exists = false;
+					for (var j=0; j<field.options.length; j++){
+						if (field.options[j].value == String(editorstate[targets[i]])) exists = true;
+					}
+					if (!exists){
+						var opt = document.createElement("option");
+						opt.value = editorstate[targets[i]];
+						opt.textContent = editorstate[targets[i]];
+						field.appendChild(opt);
+					}
+				}
+				field.value = editorstate[targets[i]];
 			}
 			
 		}
@@ -961,7 +985,7 @@ window.onload = function() {
 	}
 	
 	default_editorstate(); // load something into editorstate, may get overwritten
-	editorstate = defaultlute; // Venere
+	editorstate = JSON.parse(JSON.stringify(defaultlute)); // Venere. Copy, editing must not change the defaults
 	
 	loadassets();
 	
