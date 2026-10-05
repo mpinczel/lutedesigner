@@ -53,55 +53,21 @@ features_init.push(function(){
 
 	// creel(tagname, id, cla, attrs, NS, del){
 	// to metaselector
-	var meta = getelid("metaselector");
+	// var meta = getelid("metaselector");
 
+
+	// var output = getelid("metaselector");
+	// var p = creel("p");
+	// p.innerHTML = '';
 	// var label = creel("label");
-	// label.innerHTML = '<button id="copylinkbutton" onclick="copylink();">Copy link (to limited mode)</button>';
-	// addel(meta, label);
-
-	var label = creel("label");
-	label.innerHTML = '<button id="editorstatebutton" onclick="download_editorstate(true);">Save Preset As...</button>';
-	addel(meta, label);
-
-	var label = creel("label");
-	label.innerHTML = 'Open Preset<input type="file" id="editorstateuploadbutton" onchange="upload_editorstate(this);" accept=".json"/>';
-	addel(meta, label);
-
-
-	var label = creel("label");
-	label.innerHTML = '<button id="downloadbutton" onclick="downloaddrawing();">Download SVG drawing</button>';
-	addel(meta, label);
-
-	// var label = creel("label");
-	// label.innerHTML = '<button id="hidehandles" onclick="hidehandles(this);">Show handles</button>';
-	// addel(meta, label);
-	
-	var opt = creel("option");
-	opt.value = "technical";
-	opt.innerHTML = "Technical drawing";
-	addel(getelid("drawingpurpose"), opt);
+	// label.innerHTML = '<button id="downloadbutton" onclick="downloaddrawing();">Download SVG drawing in 1:1 scale</button> Choose this for further editing or printing in true scale especially if you intend to build an instrument based on the plans. You can open the output SVG file in <a href="https://inkscape.org/">Inkscape</a>. ';
+	// addel(output, p);
+	// addel(output, label);
 	
 	// var label = creel("label");
-	// label.innerHTML = 'Drawing is a<select id="drawingpurpose" name="drawingpurpose" onchange="settingchange(this)"><option value="technical" selected>Technical drawing</option></select>';
-	// addel(meta, label);
-
-	// To pegboxstyle
-	var peg = getelid("pegboxstyle");
-
-	var label = creel("option");
-	label.innerHTML = 'Swan neck';
-	label.value = 'swanneck';
-	addel(peg, label);
-
-	var label = creel("option");
-	label.innerHTML = 'Swan neck triple';
-	label.value = 'swannecktriple';
-	addel(peg, label);
-
-	var label = creel("option");
-	label.innerHTML = 'Orpharion / Curvy /w head';
-	label.value = 'curvy';
-	addel(peg, label);
+	// label.innerHTML = '<button id="downloadA4button" onclick="downloaddrawing(\'A4\');">Download SVG drawing (single A4 sheet)</button> Choose this if you just want to see the drawing easily or print it on a single sheet. Rib and mold templates mostly hidden.';
+	// addel(output, p);
+	// addel(output, label);
 
 });
 features.push(function add_layers(){
@@ -112,7 +78,7 @@ features.push(function add_layers(){
 	var templateslayer = makegroup(exportlayer, "templateslayer", "templates");
 	var fformplanlayer = makegroup(exportlayer, "foamformplanlayer", "foamform");
 	var cformplanlayer = makegroup(exportlayer, "carvedformplanlayer", "carvedform");
-	drawrect(fullplanlayer, new Point(-400,0), {w:190,h:277}, NOFILLTHIN, "rect-1");
+	// drawrect(fullplanlayer, new Point(-400,0), {w:190,h:277}, NOFILLTHIN, "rect-1");
 });
 function copylink(){
 	// Copy link to online limited mode lutedesigner
@@ -190,7 +156,8 @@ function save_as_file(){
 	// Needs php script that handles the upload on the server
 	var state_to_save = save_editorstate()
 }
-function downloaddrawing(){
+function downloaddrawing(pagesize){
+	var pagesize = pagesize || "full";
 	// Save svg contents into a file, and open file download dialog for the user locally
 	var drawing = getelid("designer-canvas");
 	drawing.setAttribute("xmlns:sodipodi", "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd");
@@ -205,7 +172,12 @@ function downloaddrawing(){
 	// scale is calculated automatically from viewbox size and page size.
 	drawing.setAttribute("width", "210mm");
 	drawing.setAttribute("height", "297mm");
-	drawing.setAttribute("viewBox", "0 0 210 297");
+	if (pagesize == "A4"){
+		drawing.setAttribute("viewBox", "0 0 "+parseInt(DRAWINGWIDTH+20)+" "+parseInt(DRAWINGHEIGHT));
+	} else {
+		drawing.setAttribute("viewBox", "0 0 210 297");
+	}
+	
 	delelid("handlelayer"); // Remove handles etc
 	// Add scale & user unit information for inkscape
 	var scale = [
@@ -218,17 +190,22 @@ function downloaddrawing(){
 	"pagecolor","#ffffff",
 	"inkscape:pageopacity","1",
 	"units","mm"];
-	var s = creel("sodipodi:namedview", "namedview", "", scale);
+	/* if (pagesize == "A4"){
+		scale[7] = "0.25";
+		scale[9] = "0.25";
+	} */
+	// tagname, id, cla, attrs, NS, del)
+	var s = creel("sodipodi:namedview", "namedview", "", scale,NAMESPACE);
 	addel(drawing, s);
 	// Make a filename that makes sense
 	var b = 1;
 	var bm="";
 	while (editorstate["mensur_"+b] && b < editorstate.numbernuts){
-		bm = getmensur(b);
+		bm = parseInt(getmensur(b)/10);
 		b++;
 	} 
 	var fname = editorstate.bodyshapefromlist+"_"+ 
-				editorstate.mensur+ "mm"+
+				parseInt(editorstate.mensur/10)+ "cm"+
 				bm+"_"+ 
 				stringing()+".svg";
 	// offer a download

@@ -1,213 +1,262 @@
 
-<body>
-<!--
-/*
-	<Lutedesigner - A parametric design aid for lutes>
-    Copyright (C) 2019  Lauri Niskanen
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
--->
-
-<style>
-body{width:100%;height:100%;margin:0px;padding:0px;}
-#pagewrapper{width:100%;height:100%;margin:0px;padding:0px;overflow:hidden;}
-#designer-control-panel{
-	width: 30vw;
-	display: inline-block;
-	height: 100%;
-	overflow-y: scroll;
-}
-#designer-canvas-wrapper {
-	width: 70vw;
-	height: 100vh;
-	border-style: solid;
-	border-width: 1px;
-	background: #f9f9f9;
-	display: inline-block;
-	top: 0px;
-	position: fixed;
-	overflow: hidden;
-	box-sizing: border-box;
-}
-label {
-	display:block;
-}
-.hidehandles {display:none;}
-input[type=number]{
-    width: 5em;
-} 
-#bodyviewer{
-	position: fixed;
-	height: 100%;
-	width: 70vw;
-	right:0px;
-	top:0px;
-}
-.hidebodyviewer {display:none;}
-h4 {
-	margin: 1em 0 0 0;
-}
-</style>
-<div id="pagewrapper">
+<div id="pagewrapper"  ondrop="dropSVG(event);" ondragover="dragOverHandler(event);">
 <input id="designer-backup" type="text" style="display:none;">
 <div id="designer-control-panel" >
-<div id="usage">
-	<center><a href=".."><img src="../includes/2014logoontopopt_s.png" style="height:3em;"></a></center>
+<div id="logo_area">
+	<center><a href=".."><img src="../includes/2014logoontopopt_s.png" style="height:3em;"></a>
+	<h2 id="lutedesigner-name" style="margin-top:0.4em; margin-bottom:0.1em;">Lute&nbsp;Designer</h2>
+	</center>
 </div>
 <div id="usage">
-	<h4>Using the Lute Designer</h4>
-	<p>Left click pans, Wheel zooms, Middle button or pressing the Wheel measures. Click "Download SVG Drawing" to save your drawing.</p>
-</div>
-<div id="Paypal">
-	<h4>Free software</h4>
-	<p>Lute Designer is free open source software licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPLv3</a>. It has missing features and probably some bugs and does not work on mobile browsers. Use at your own risk. Historical accuracy of preset values is not guaranteed. If you find it useful please consider supporting the development of this software with a small donation:</p>
-	<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
-<input type="hidden" name="cmd" value="_s-xclick">
-<input type="hidden" name="hosted_button_id" value="HA7CJUNMDFKFJ">
-<table>
-<tr><td><input type="hidden" name="on0" value="Support Level">Support Level</td></tr><tr><td><select name="os0">
-	<option value="Altruist Almsgiver">Altruist Almsgiver €5.00 EUR</option>
-	<option value="Benevolent Bestower">Benevolent Bestower €10.00 EUR</option>
-	<option value="Champion Contributor">Champion Contributor €20.00 EUR</option>
-</select> </td></tr>
-</table>
-<input type="hidden" name="currency_code" value="EUR">
-<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_buynow_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
-<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
-</form>
-
-</div>
-
-<div id="metaselector">
-	<!--<input type="" id="bodyshape" name="bodyshape" onclick=""></input>-->
-	<h4>Drawing options</h4>
+	<center>
+	<p style="font-size:0.5em; margin-bottom:2em;">When will I ever need trigonometry in real life?</p>
+	</center>
 	
-	<label>Drawing is a
-	<select id="drawingpurpose" name="drawingpurpose" onchange="settingchange(this)">
-		<option value="concept" selected="">Concept</option>
+	
+</div>
+
+<button class="collapsible">Information</button>
+<div id="information" class="options_area">
+	<label>Lute Designer is not just a collection of free lute plans. It is a program that can draw a full technical drawing for any kind of lute based on parameters you set.</label>
+
+	<label>Left click pans, Wheel zooms, Middle button or pressing the Wheel measures. Click "Download SVG Drawing" under "Output" to save your drawing. Hover over options for help. Ctrl+z to undo, ctrl+y to redo.</label>
+	<label>On mobile, drag to pan, pinch to zoom. Undo, redo and measure are available as buttons above.</label>
+	<label>To share a drawing with somebody else, or save it for later, simply copy the whole URL from the address bar.</label>
+	
+	
+	<!-- <div class="options_area_title"><h4>Information</h4><button class="hiderbutton" onclick="hide_options_area(this);">-</button></div> -->
+	<label>
+	<p>Lute Designer is <a href="https://github.com/Laukku/lutedesigner" target="new">free open source software <img class="icon_in_text" src="newtab.png"></img></a> licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="new">GPLv3 <img class="icon_in_text" src="newtab.png"></img></a>. It has missing features and probably some bugs. Use at your own risk. Historical accuracy of preset values is not guaranteed. See recent changes: <a href="changelog.php" target="new">Changelog <img class="icon_in_text" src="newtab.png"></img></a> If you find it useful please consider supporting the development of this software with a small donation: <a target="new" href="https://paypal.me/LuuttuLauri"><img style="height: 1.2em;" class="icon_in_text" src="paypalfavicon.ico"></img>Paypal.me</a></p>
+	<!-- <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+	<input type="hidden" name="cmd" value="_s-xclick">
+	<input type="hidden" name="hosted_button_id" value="HA7CJUNMDFKFJ">
+	<table>
+	<tr><td><input type="hidden" name="on0" value="Support Level">Support Level</td></tr><tr><td><select name="os0">
+		<option value="Altruist Almsgiver">Altruist Almsgiver €5.00 EUR</option>
+		<option value="Benevolent Bestower">Benevolent Bestower €10.00 EUR</option>
+		<option value="Champion Contributor">Champion Contributor €20.00 EUR</option>
+	</select> </td></tr>
+	</table>
+	<input type="hidden" name="currency_code" value="EUR">
+	<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_buynow_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+	<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
+	</form> -->
+	</label>
+</div>
+<button class="collapsible">Drawing</button>
+<div id="drawing" class="options_area">
+
+	<label title="Draw different instruments side by side to compare them. This feature is work in progress and does not accurately calculate rib shapes or forms, and also does not yet draw all extension types. However, this mode represents the most recent developments of Lute Designer and supports some features not yet available otherwise, such as bridge and nut angle adjustment. Only the first instrument is saved in the URL.">Drawing mode
+	<select id="drawingpurpose" name="drawingpurpose" onchange="comparison_mode(this)">
+		<option value="technical">Technical drawing for one instrument</option>
+		<option value="comparison">Comparison (work in progress)</option>
+		<!-- <option value="comparison">Comparison side by side</option> -->
+		<!-- <option value="comparison">Comparison on top</option> -->
 	</select>
 	</label>
 	
 	
-	<label title="Select instrument, all values in the editor will be overwritten.">Instrument Preset
+	<label id="instrumentpresentlabel" title="Select instrument, all values in the editor will be overwritten.">Instrument Preset
 	<select id="instrumentpreset" name="instrumentpreset" onchange="select_instrument(this)">
 		<!-- Gets filled from instrumentpresets at startup -->
 	</select>
 	</label>
-	
-	<label><button id="bodyviewerbutton" onclick="start_bodyviewer(this);">View body in 3D</button></label>
+	<div id="comparisonoptions" style="display:none" class="options_subarea">
+		
+	</div>
 	
 	
 </div>
-<div id="body">
+<button class="collapsible">Download</button>
+<div id="metaselector" class="options_area">
+	<label><button id="downloadbutton" onclick="downloaddrawing();">Download SVG drawing in 1:1 scale</button> Choose this for further editing or printing in true scale especially if you intend to build an instrument based on the plans. You can open the output SVG file in <a href="https://inkscape.org/">Inkscape</a>. Drop an SVG file created this way back into Lute Designer to open it (Any changes you made to the SVG file will not appear here).</label>
+	<label><button id="downloadA4button" onclick="downloaddrawing('A4');">Download SVG drawing (single A4 sheet)</button> Choose this if you just want to see the drawing easily or print it on a single sheet. Rib and mold templates mostly hidden.</label>
+	<label><button id="downloadSTLbutton" onclick="export_STL();">Download STL model</button> This downloads what you see in the 3D view, as a binary STL file which you can open in various 3D software. Note that the model is guaranteed to not directly work for 3D printing because the parts are separate, not water tight, and have zero thickness.</label>
+	
+	<!-- <label><button id="bodyviewerbutton" onclick="start_bodyviewer(this);">View body in 3D</button></label> -->
+	
+	
+</div>
+<!-- <button class="collapsible">Output</button> -->
+<!-- <div id="output" class="options_area"> -->
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+	<!-- <input type="" id="bodyshape" name="bodyshape" onclick=""></input> -->
+
+
+	
+	<!-- <label><button id="bodyviewerbutton" onclick="start_bodyviewer(this);">View body in 3D</button></label> -->
+	
+	
+<!-- </div> -->
+
+
+<button class="collapsible">Body</button>
+<div id="body" class="options_area">
 	<!--<input type="" id="bodyshape" name="bodyshape" onclick=""></input>-->
-	<h4>Body</h4>
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+	
 	<label>Body construction method
 	<select id="bodyshapefrom" name="bodyshapefrom" onchange="changebodymethod()">
-		<option value="classical">Classical construction</option>
+		<option value="classical">Lute: Classical construction</option>
 		<!-- <option value="construct">Construct from path</option> -->
-		<option value="fromlist" selected>From existing lute</option>
+		<option value="fromlist" selected>Lute: From preset body list</option>
+		<option value="guitar">Guitar mode</option>
+		<!-- <option value="svgpath">Free Mode: edit SVG path directly</option> -->
 	</select>
 	</label>
 	
 	<!-- Construction options, originally hidden -->
-	<div id="constructionoptions" style="display:none">
+	<div id="guitaroptions" style="display:none" class="options_subarea">
+		
+		<label>Select guitar body
+		<select id="guitarfromlist" name="guitarfromlist" onchange="settingchange(this)">
+		
+		
+			<!-- Populated from file -->
+		</select>
+		</label>
 	
-	<label title="Width of the body.">Body width
-	<input id="constructionwidth" size="2" step="0.01" onchange="settingchange(this)" type="number" value="4" min="1" max="10"></label>
+		<label title="From soundboard to back at body end in mm. In case of round body or angled back, this stays constant.">Side height
+		<input id="guitardepth" size="2" step="0.1" onchange="settingchange(this)" type="number" value="80" min="30" max="250"></label>
+		
+		<label title="Angle of back from body end to neck end in degrees.">Back angle
+		<input id="guitarangle" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0" min="0" max="45"></label>
+		
+		<label title="Height of arc from end of body to heel in mm.">Back roundness lengthwise
+		<input id="guitarroundl" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="100"></label>
+		
+		<label title="Height of arc from side to side in mm.">Back roundness widthwise
+		<input id="guitarroundw" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="100"></label>
+		
+		<label title="How much narrower a rib should be at the neck end">Rib taper
+		<input id="guitartaper" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="20"></label>
+		
+		<label title="How bent each rib should be widthwise">Rib concavity
+		<input id="guitarconcavity" size="2" step="0.05" onchange="settingchange(this)" type="number" value="0" min="0" max="1"></label>
+		
+
+	</div> <!-- End guitar options -->
 	
-	<label title="Length of the body; Where side arcs meet on the center line, disregarding potential shoulder arc.">Body length
-	<input id="constructionlength" size="2" step="0.01" onchange="settingchange(this)" type="number" value="6.5" min="1" max="10"></label>
-	
-	<label title="Mensur to base body size on; Divided by 9 to obtain the length of one unit.">Construction string length 
-	<input id="constructionmensur" size="2" step="1" onchange="settingchange(this)" type="number" value="600" min="100" max="1500"></label>
-	
-	<label title="Radius of the arc that gives the shape of the lute's bottom. Larger values make the bottom flatter.">Bottom radius
-	<input id="constructionbottom" size="2" step="0.5" onchange="settingchange(this)" type="number" value="6" min="1" max="500"></label>
-	
-	<label title="Radius of the arc that gives the shape of the lute's side.">Side radius
-	<input id="constructionside" size="2" step="0.01" onchange="settingchange(this)" type="number" value="6" min="4" max="10"></label>
-	
-	<label title="Radius of the arc that connects the bottom and the side.">Connector radius
-	<input id="constructionsmall" size="2" step="0.01" onchange="settingchange(this)" type="number" value="1.333333" min="1" max="3"></label>
-	
-	<label title="Radius of shoulder arc.">Shoulder radius
-	<input id="constructionshoulder" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0.0" min="0" max="10"></label>
-	
-	<label title="How much the should arc should shorten the body.">Shoulder reduction
-	<input id="constructionshoulderlength" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0.0" min="0" max="3"></label>
-	
-	<label title="Later lutes were designed with a wider body, by inserting an imaginary wedge between the body shapes.">Wedge angle (degrees)
-	<input id="constructionwedge" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="20"></label>
-	
-	
-	<label><input id="presetoverlay" type="checkbox" onchange="settingchange(this)">Show existing lute shape overlay</label>
-	
-	
-	
+	<!-- Construction options, originally hidden -->
+	<div id="constructionoptions" style="display:none" class="options_subarea">
+		
+		<label title="Width of the body.">Body width
+		<input id="constructionwidth" size="2" step="0.01" onchange="settingchange(this)" type="number" value="4" min="1" max="10"></label>
+		
+		<label title="Length of the body; Where side arcs meet on the center line, disregarding potential shoulder arc.">Body length
+		<input id="constructionlength" size="2" step="0.01" onchange="settingchange(this)" type="number" value="6.5" min="1" max="10"></label>
+		
+		<label title="Mensur to base body size on; Divided by 9 to obtain the length of one unit.">Construction string length 
+		<input id="constructionmensur" size="2" step="1" onchange="settingchange(this)" type="number" value="600" min="100" max="1500"></label>
+		
+		<label title="Radius of the arc that gives the shape of the lute's bottom. Larger values make the bottom flatter.">Bottom radius
+		<input id="constructionbottom" size="2" step="0.5" onchange="settingchange(this)" type="number" value="6" min="1" max="500"></label>
+		
+		<label title="Radius of the arc that gives the shape of the lute's side.">Side radius
+		<input id="constructionside" size="2" step="0.01" onchange="settingchange(this)" type="number" value="6" min="4" max="10"></label>
+		
+		<label title="Radius of the arc that connects the bottom and the side.">Connector radius
+		<input id="constructionsmall" size="2" step="0.01" onchange="settingchange(this)" type="number" value="1.333333" min="1" max="3"></label>
+		
+		<label title="Radius of shoulder arc.">Shoulder radius
+		<input id="constructionshoulder" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0.0" min="0" max="10"></label>
+		
+		<label title="How much the shoulder arc should shorten the body.">Shoulder reduction
+		<input id="constructionshoulderlength" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0.0" min="0" max="3"></label>
+		
+		<label title="Later lutes were designed with a wider body, by inserting an imaginary wedge between the body shapes.">Wedge angle (degrees)
+		<input id="constructionwedge" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="20"></label>
+		
+		
+		<label><input id="presetoverlay" type="checkbox" onchange="settingchange(this)">Show existing lute shape overlay</label>
+		
+		
 	
 	</div> <!-- End construction options -->
 	
 	
-	<!-- <label style="display:none">Constructor Type
-	<select id="constructor" name="constructor" onchange="settingchange(this)">
-		<option value="medieval">Medieval</option>
-		<option value="zwolle">Zwolle, Early</option>
-		<option value="renaissance" selected>Renaissance</option>
-		<option value="wedge">Archlute /w wedge</option>
-	</select>
-	</label> -->
-	
-	<label>Select lute
-	<select id="bodyshapefromlist" name="bodyshapefromlist" onchange="settingchange(this)">
-	
+	<!-- Construction options, originally hidden -->
+	<!-- <div id="freemodeoptions" style="display:none" class="options_subarea">
+		<label>For nerds. Freely edit the body shapes of the instrument. The shapes are described in SVG path syntax. The current body shapes have been filled in as a starting point.</label>
 		
-		<!-- Populated from file -->
-	</select>
-	</label>
+		<label title="Path">Soundboard edge shape</label>
+		<textarea id="freemodeside"style="width:100%; height:300px"  onchange="settingchange(this)" ></textarea>
+		
+		<label title="Path">Body middle shape</label>
+		<textarea id="freemodemiddle" style="width:100%; height:300px" onchange="settingchange(this)" ></textarea>
+		
+		
+		
+	
+	</div>  --><!-- End construction options -->
+	
+	
+	<!-- Lute options, shared by classical and preset lute -->
+	<div id="luteoptions" style="display:block" class="options_subarea">
+		
+		<label>Select lute body
+		<select id="bodyshapefromlist" name="bodyshapefromlist" onchange="settingchange(this)">
+		
+		
+			<!-- Populated from file -->
+		</select>
+		</label>
+		
+		<label>Rib spacing style
+		<select id="ribspacing" name="ribspacing" onchange="settingchange(this)">
+			<option value="even">Evenly at edge</option>
+			<option value="evenclasp" selected>Evenly at endclasp</option>
+			<!-- <option value="above">Above edge (for deep bodies)</option> -->
+			<!-- <option value="theorbo">Whatever can be hidden under endclasp</option> -->
+		</select>
+		</label>
+		
+		<label title="How close to the center the ribs' ends are under the endclasp. Values 0...1; 0 being as close together as possible.">Rib spread at endclasp
+		<input id="ribspread" size="2" step="0.05" onchange="settingchange(this)" type="number" value="1" min="0" max="1"></label>
+		
+		
+		<label title="The depth and shape of the bowl will be determined by the shape of the soundboard. If you want all the ribs to be the same shape, also set body cross-section bulge to 2 and rib spread to 0."><input id="usesideasmiddle" type="checkbox" onchange="settingchange(this)" >Use soundboard shape as middle shape</label>
+		<!-- Body depth ratio -->
+		<label title="Resize body shape for the side view shape.">Body depth ratio
+		<input id="constructiondepthratio" size="2" step="0.01" onchange="settingchange(this)" type="number" value="1.0" min="0.5" max="1.5"></label>
+		
+		<!-- Body mid shape shift -->
+		<label title="More mass towards the neck.">Body side view shape shift
+		<input id="constructionshapeshift" size="2" step="0.01" onchange="settingchange(this)" type="number" value="0" min="-0.2" max="0.5"></label>
+			
+			
+		<label title="How much bulge to apply to the body cross section at the wider end, tapers to semicircular towards the neck. Values 2...3; 2 is semicircular.">Body cross-section bulge
+		<input id="bulge" size="2" step="0.05" onchange="settingchange(this)" type="number" value="2.3" min="2" max="3"></label>
+			
+	</div><!-- End lute options -->
+	
+	
 	
 	<label>Number of ribs
-	<input id="numberofribs" size="2" step="2" onchange="settingchange(this)" type="number" value="9" min="9" max="51"></label>
+	<input id="numberofribs" size="2" step="2" onchange="settingchange(this)" type="number" value="9" min="5" max="51"></label>
 	
-	<label title="How much bulge to apply to the body cross section at the wider end, tapers to semicircular towards the neck. Values 2...3; 2 is semicircular.">Body cross-section bulge
-	<input id="bulge" size="2" step="0.05" onchange="settingchange(this)" type="number" value="2.3" min="2" max="3"></label>
-	
+	<!-- 
 	<label>Soundboard bar divisions
 	<input id="divisions" size="2" step="1" onchange="settingchange(this)" type="number" value="9" min="7" max="12"></label>
-	
-	<label>Rib spacing style
-	<select id="ribspacing" name="ribspacing" onchange="settingchange(this)">
-		<option value="even">Evenly at edge</option>
-		<option value="evenclasp" selected>Evenly at endclasp</option>
-		<!-- <option value="above">Above edge (for deep bodies)</option> -->
-		<!-- <option value="theorbo">Whatever can be hidden under endclasp</option> -->
-	</select>
-	</label>
-	
-	<label title="How close to the center the ribs' ends are under the endclasp. Values 0...1; 0 being as close together as possible.">Rib spread at endclasp
-	<input id="ribspread" size="2" step="0.05" onchange="settingchange(this)" type="number" value="1" min="0" max="1"></label>
+	 -->
 	
 	<label title="Body scale">Body scale
 	<input id="bodyscale" size="2" step="0.01" onchange="settingchange(this)" type="number" value="1" min="0.1" max="3"></label>
+
+	<label title="Add to last rib">Add to last rib
+	<input id="lastribadd" size="2" step="0.5" onchange="settingchange(this)" type="number" value="3" min="-50.0" max="50"></label>
 	
-	<label>Bridge offset (move toward neck by)
-	<input id="bridgeoffset" size="2" step="0.5" onchange="settingchange(this)" type="number" value="8"></label>
+	<label title="Deepen body, moving all ribs downward, like on a mandolino">Deepen body
+	<input id="deepenbody" size="2" step="0.1" onchange="settingchange(this)" type="number" value="0" min="0" max="100"></label>
 	
+	
+
 </div>
-<div id="rosette">
-	<h4>Rosette</h4>
+
+<button class="collapsible">Rosette</button>
+<div id="rosette" class="options_area">
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+	
 	<label>Select rosette type
 	<select id="rosettelist" name="rosettelist" onchange="settingchange(this)">
 		<option value="single">Single rosette</option>
@@ -218,30 +267,96 @@ h4 {
 	<input id="rosettescale" size="2" step="1.0" onchange="settingchange(this)" type="number" value="100">percent</label>
 	
 </div>
-<div id="pegbox">
-	<h4>Pegbox</h4>
+
+<button class="collapsible">Neck</button>
+<div id="neckpegbox" class="options_area">
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+
 	<label>Pegbox / Extension style
 	<select id="pegboxstyle" name="pegboxstyle" onchange="settingchange(this)">
 		<option value="renaissance" selected>Renaissance</option>
 		<option value="chanterelle">Renaissance /w chanterelle rider</option>
-		<option value="bassrider">13c Bass and Treble rider</option>
-		<option value="theorbo">Theorbo</option>
+		<option value="bassrider">13c Bass rider (Hoffmann)</option>
+		<option value="bassriderEdlinger">13c Bass rider (Edlinger)</option>
+		<option value="doublehead">Dutch 12c double head</option>
+		<option value="hoffmann1740">Swan neck (Hoffmann 1740)</option>
+		<option value="Rauche">Swan neck (Rauche)</option>
+		<!-- <option value="triple">Swan Neck Triple</option> -->
+		<option value="jauck">Jauck Mandora Extension</option>
+		
+		<!-- Theorbos -->
+		<option value="theorbo">Theorbo - Italian</option>
+		<option value="theorboSmallFrench">Theorbo - small French</option>
+		<option value="theorboHarz">Archlute - Harz</option>
+		<option value="theorboKoch">Archlute - Koch</option>
+		<option value="theorboSmallKoch">Archlute - small Koch</option>
+		<option value="theorboEnglish">Theorbo - English</option>
+		
+		<!-- Carved -->
+		<option value="mandolino">Mandolino</option>
+		<option value="colascione">Colascione</option>
+		
+		
+		<!-- Guitars -->
+		<option value="GiorgioSellas1624">Giorgio Sellas 1624 guitar</option>
+		<option value="JeanVoboam1687">Jean Voboam 1687 guitar</option>
+		<option value="ChambureVihuela">Chambure Vihuela</option>
+		<option value="Dias1581">Dias 1581 guitar</option>
 	</select>
 	</label>
+	
+	<label title="This only affects renaissance style pegboxes.">Pegbox Angle
+	<input id="pegboxangle" size="2" step="0.1" min="0" max="45" onchange="settingchange(this)" type="number" value="0"></label>
+	
+	<label title="This only affects renaissance style pegboxes.">Pegbox curve
+	<input id="pegboxcurve" size="2" step="0.05" min="0" max="1" onchange="settingchange(this)" type="number" value="0"></label>
+	
 	<label><input id="foldable" type="checkbox" onchange="settingchange(this)" checked>Foldable extension</label>
 	
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+	
+	<!-- <label>Frets on neck -->
+	<!-- <input id="fretsonneck" size="2" step="0.1" onchange="settingchange(this)" type="number" value="8.4"></label> -->
+	<label>Fingerboard join style
+	<select id="fingerboardstyle" name="fingerboardstyle" onchange="settingchange(this)">
+		<option value="fangs" selected>Fangs</option>
+		<option value="smallfangs" selected>Small fangs</option>
+		<option value="longsmallfangs" selected>Long narrow fangs</option>
+		<option value="flat">Flat</option>
+	</select>
+	</label>
+	
+	<label>
+	<select id="limitorset" name="limitorset" onchange="settingchange(this)">
+		<option value="limit" selected>Limit</option>
+		<option value="set">Set</option>
+	</select>
+	neck width at body joint
+	<input id="neckwidthlimit" size="2" step="1" onchange="settingchange(this)" type="number" value="100">
+	</label>
+	
+	<label>Add or substract from width at nut
+	<input id="neckadd" size="2" step="1" onchange="settingchange(this)" type="number" value="0"></label>
+	
+	<label title="The fingerboard nut angle is normally perpendicular to the centerline of the neck; This input allows you to adjust it.">Nut angle
+	<input id="nutangle" size="2" step="0.1" min="-30" max="30" onchange="settingchange(this)" type="number" value="0"></label>
+	
 </div>
-<div id="strings">
-	<h4>Strings</h4>
+
+<button class="collapsible">Strings</button>
+<div id="strings" class="options_area">
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+
 	<label>Chanterelles (single top strings)<input id="chanterelles" size="2" step="1" onchange="settingchange(this)" type="number" value="1" min="0" max="2"></label>
 	
 	<label>Number of Nuts<input id="numbernuts" size="2" step="1" onchange="makenutselectors(this);settingchange(this);" type="number" value="1" min="1" max="20"></label>
 	
-
+	<label>
 	<table id="nut_table">
 	
 	
 	</table>
+	</label>
 	<label><input id="drawallstrings" type="checkbox" onchange="settingchange(this)" checked>Draw every string</label>
 	
 	<!-- 
@@ -262,29 +377,31 @@ h4 {
 	<label><input id="singlebasses" type="checkbox" onchange="settingchange(this)" checked>Bass courses are single strings</label>
 	 -->
 </div>
-<div id="fingerboard">
-	<h4>Fingerboard</h4>
-	<!-- <label>Frets on neck -->
-	<!-- <input id="fretsonneck" size="2" step="0.1" onchange="settingchange(this)" type="number" value="8.4"></label> -->
-	<label>Fingerboard join style
-	<select id="fingerboardstyle" name="fingerboardstyle" onchange="settingchange(this)">
-		<option value="fangs" selected>Fangs</option>
-		<option value="flat">Flat</option>
+
+<button class="collapsible">Bridge</button>
+<div id="bridge" class="options_area">
+	
+	<label>Bridge style
+	<select id="bridgestyle" name="bridgestyle" onchange="settingchange(this)">
 	</select>
-	<label>
-	<select id="limitorset" name="limitorset" onchange="settingchange(this)">
-		<option value="limit" selected>Limit</option>
-		<option value="set">Set</option>
-	</select>
-	neck width at body joint
-	<input id="neckwidthlimit" size="2" step="1" onchange="settingchange(this)" type="number" value="100">
 	</label>
-	<label>Add or substract from width at nut
-	<input id="neckadd" size="2" step="1" onchange="settingchange(this)" type="number" value="0"></label>
+	
+	<label>Bridge offset (move toward neck by)
+	<input id="bridgeoffset" size="2" step="0.5" onchange="settingchange(this)" type="number" value="8"></label>
+	
+	<label>Bridge sideways offset
+	<input id="bridgeoffsetx" size="2" step="0.5" onchange="settingchange(this)" type="number" value="0" min="-100" max="100"></label>
+	
+	<label>Bridge angle
+	<input id="bridgeangle" size="2" step="0.1" min="-30" max="30" onchange="settingchange(this)" type="number" value="0"></label>
+	
+	
 </div>
 
-<div id="bridge">
-	<h4>Bridge</h4>
+<button class="collapsible">Bridge String Spacing</button>
+<div id="bridge" class="options_area">
+
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
 	<label>String spacing preset
 	<select id="spacingpreset" name="bridgestyle" onchange="spacingpresetchange(this)">
 		<option value="renaissance" selected>Renaissance</option>
@@ -293,17 +410,10 @@ h4 {
 		<option value="theorbosingle">Theorbo single</option>
 		<option value="archlute">Archlute</option>
 		<option value="guitar">Guitar</option>
+		<option value="mandolino">Mandolino</option>
 		
 	</select>
 	</label>
-	
-	
-	<label>Bridge style
-	<select id="bridgestyle" name="bridgestyle" onchange="settingchange(this)">
-
-		
-	</select>
-	
 	
 	<label>Distance between courses on the bridge
 	<input id="distcoursesbridge" size="2" step="0.1" onchange="settingchange(this)" type="number" value="9"></label>
@@ -316,8 +426,11 @@ h4 {
 	
 	
 </div>
-<div id="nut">
-	<h4>Nut</h4>
+
+<button class="collapsible">Nut String Spacing</button>
+<div id="nut" class="options_area">
+	<!-- <div class="options_area_title"><h4></h4><button class="hiderbutton" onclick="hide_options_area(this);">+</button></div> -->
+	
 	<label>between courses
 	<input id="distcoursesnut" size="2" step="0.1" onchange="settingchange(this)" type="number" value="5"></label>
 	<label>between chanterelles
@@ -330,16 +443,138 @@ h4 {
 	<input id="distbasscoursesnut" size="2" step="0.1" onchange="settingchange(this)" type="number" value="4"></label>
 </div>
 
+<button class="collapsible" >Analysis</button>
+<div id="analysis" class="options_area" > 
+	<label>Experimental feature. Results have not been verified. Only available for "With Forms" drawing modes. </label>
+	
+	<label>
+	<button onclick="save_analysis();" title="Save current values in table below for later comparison">Save current</button>
+	
+	<!-- <button onclick="">View in new window</button> -->
+	<button class="disabled" onclick="export_analysis_csv();">Export CSV</button>
+	</label>
+	
+	<label><table id="analysis_table"></table></label>
+	<label>
+	<button onclick="body_normal_map();" title="Where do the perpendiculars, or normals, of each ribs segment point to on the soundboard">Normal map</button>
+	
+	<button onclick="body_normal_map('straight');" title="Where do rays shot along the z-axis reflect back on the soundboard. Color shows how many reflections it took to get to the soundboard.">Reflections (Z-axis)</button>
+	
+	<button onclick="body_normal_map('bridge');" title="Where do rays shot from the bridge reflect back on the soundboard. Color shows how many reflections it took to get to the soundboard.">Reflections (bridge)</button>
+	</label>
+	
+	<label>
+	<button onclick="delel(getelid('analysis-normals'));" title="">Hide maps</button>
+	</label>
+	
+	<label><input id="keep_drawing_reflection" type="checkbox">Redraw map after setting change</label>
+	
+	
+</div>
+<button class="collapsible" >Case</button>
+<div id="case" class="options_area" > 
+	
+	
+	<label><input id="drawcase" type="checkbox" onchange="calculatecase(this)">Draw case on top of instrument</label>
+	
+	<label>Case style - lid
+	<select id="casestylelid" name="casestylelid" onchange="settingchange(this)">
+		<option value="rectilinear" selected >Rectilinear</option>
+		<option value="curvysharp">Curvy - sharp tube joint</option>
+		<option value="curvy">Curvy - smooth tube joint</option>
+	</select>
+	</label>
+	
+	<label>Case style - side
+	<select id="casestyleside" name="casestyleside" onchange="settingchange(this)">
+		<option value="flat" selected >Flat</option>
+		<!-- <option value="flatpegbox">Flat /w pegbox</option> -->
+		<option value="curvy">Curvy /w pegbox</option>
+		<option value="curvytube">Curvy /w tube</option>
+		<option value="lute">Lute bowl /w pegbox</option>
+		<option value="lutetube">Lute bowl /w tube</option>
+	</select>
+	</label>
+	<label>Neck tube style
+	<select id="tubestyle" name="tubestyle" onchange="settingchange(this)">
+		<option value="bentbox" selected>Bent - box</option>
+		<option value="bentcurvy" >Bent - curvy</option>
+		<option value="straight">Straight</option>
+		<option value="telescopic">Telescopic</option>
+	</select>
+	</label>
+	
+	<label>Plywood thickness
+	<input id="casewoodthick" size="2" step="0.1" onchange="settingchange(this)" type="number" value="4">mm</label>
+	
+	<label>Foam thickness
+	<input id="casefoamthick" size="2" step="1" onchange="settingchange(this)" type="number" value="20">mm</label>
+	
+	<label>	<button onclick="auto_case();" title="Attempt to automatically figure out case size">Automatic size</button></label>
+	
+	
+	
+	<label>Width
+	<input id="casewidth" size="2" step="1" onchange="settingchange(this)" type="number" value="300">mm</label>
+	
+	<label>Length
+	<input id="caselength" size="2" step="1" onchange="settingchange(this)" type="number" value="1000">mm</label>
+	
+	<label>Depth
+	<input id="casedepth" size="2" step="1" onchange="settingchange(this)" type="number" value="200">mm</label>
+	
+	<label>Tube width
+	<input id="tubewidth" size="2" step="1" onchange="settingchange(this)" type="number" value="200">mm</label>
+	
+	<label>Tube Depth
+	<input id="tubedepth" size="2" step="1" onchange="settingchange(this)" type="number" value="150">mm</label>
+	
+	<label>Pegbox Depth
+	<input id="pegboxdepth" size="2" step="1" onchange="settingchange(this)" type="number" value="250">mm</label>
+	
+	<label>Pegbox area Length
+	<input id="pegboxlength" size="2" step="1" onchange="settingchange(this)" type="number" value="100">mm</label>
+	
+	
+	<label>Lower radius
+	<input id="lowerradius" size="2" step="1" onchange="settingchange(this)" type="number" value="100">mm</label>
+	
+	<label>Tube radius
+	<input id="tuberadius" size="2" step="1" onchange="settingchange(this)" type="number" value="50">mm</label>
+	
+	<label>Bowl side radius
+	<input id="bowlradius" size="2" step="1" onchange="settingchange(this)" type="number" value="1000">mm</label>
+	
+	
+	<label>Bowl radius center
+	<input id="bowlradiusc" size="2" step="1" onchange="settingchange(this)" type="number" value="200">mm</label>
+	
+	
+	
+	
+</div>
+
 
 <br>
 <!-- viewBox="50,50, 100 100" --> 
 </div>
 <div id="designer-canvas-wrapper"  onwheel="zoom_editor(event)">
 <!-- <div id="designer-svgs" > -->
+	
 
-
-	<svg id="designer-canvas" style="width:100%;height:auto;overflow: visible;" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+	<svg id="designer-canvas" style="width:100%;height:100%;overflow: visible;touch-action:none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet">
 	</svg>
+	
+<div id="bodyviewer" class="hidebodyviewer"></div>
+<div id="tools">
+	<button id="zoominbutton" class="toolbuttons" onclick="zoom_editor(event);" title="Zoom in. Also available on mousewheel."> </button>
+	<button id="zoomoutbutton" class="toolbuttons" onclick="zoom_editor(event);" title="Zoom out. Also available on mousewheel."> </button>
+	<button id="undobutton" class="toolbuttons" onclick="undo_changes();" title="Undo. Also ctrl+z"> </button>
+	<button id="redobutton" class="toolbuttons" onclick="redo_changes();" title="Redo. Also ctrl+shift+z or ctrl+y"> </button>
+	<button id="measurebutton" class="toolbuttons" onclick="if (measuremode) {measuremode=false;this.classList.remove('clicked')} else {measuremode=true;this.classList.add('clicked')}" title="Measure Tool. Normally middle mouse button or wheel, click here to temporarily use left click instead."> </button>
+	<button id="bodyviewerbutton" class="toolbuttons" onclick="start_bodyviewer(this);" title="View instrument in glorious, futuristic 3D."> </button>
+
+</div>
 </div>
 <!-- These svgs have to be here so that mobile browsers load them-->
 <object id="svg-bodies" data="body.svg" type="image/svg+xml" style="width:1px;height:1px; position:absolute"></object>
@@ -347,7 +582,6 @@ h4 {
 <object id="svg-theorbos" data="theorbohead.svg" type="image/svg+xml" style="width:1px;height:1px;position:absolute"></object>
 <object id="svg-general" data="general.svg" type="image/svg+xml" style="width:1px;height:1px;position:absolute"></object>
 
-<div id="bodyviewer" class="hidebodyviewer"></div>
 <!-- </div> -->
 </div>
 </body></html>

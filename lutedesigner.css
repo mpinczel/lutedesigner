@@ -1,0 +1,144 @@
+body{width:100%;height:100%;margin:0px;padding:0px;font-family:Tahoma, Geneva, sans-serif}
+#pagewrapper{width:100%;height:100%;margin:0px;padding:0px;overflow:hidden;}
+#designer-control-panel{
+	width: 30vw;
+	display: inline-block;
+	height: 100%;
+	overflow-y: scroll;
+}
+#designer-canvas-wrapper {
+	width: 70vw;
+	height: 100vh;
+	border-style: solid;
+	border-width: 1px;
+	background: #f9f9f9;
+	display: inline-block;
+	top: 0px;
+	position: fixed;
+	overflow: hidden;
+	box-sizing: border-box;
+}
+label {
+	display:block;
+}
+.hidehandles {display:none;}
+input[type=number]{
+    width: 5em;
+} 
+#bodyviewer{
+	position: fixed;
+	height: 100%;
+	width: 70vw;
+	right:0px;
+	top:0px;
+}
+.hidebodyviewer {display:none;}
+
+
+
+.collapsible {
+  background-color: #777;
+  color: white;
+  cursor: pointer;
+  padding: 0.6em 1em 0.6em 1em;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+}
+
+.active {
+  background-color: #555;
+}
+
+.collapsible:hover {
+  background-color: #444;
+}
+
+.collapsible:before {
+  content: '\002B';
+  color: white;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+}
+
+.active:before {
+  content: "\2212";
+}
+
+.options_area {
+  padding: 0px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+  background-color: #f1f1f1;
+  overflow-x: auto;
+}
+.options_area label{ 
+	padding: 0.5em;
+}
+
+.options_subarea {
+	/* margin-left: 1.5em; */
+	background-color: #fff;
+	border-left: #555 1.5em solid;
+}
+
+#analysis_table th{
+	font-size: 0.7em;
+}
+
+.disabled { /* disabled buttons*/
+	color: gray;
+	cursor: no-drop;
+}
+#tools {
+	margin-bottom: 0.4em;
+	margin-left: 0.4em;
+	position:absolute;
+	top:4px;
+}
+.toolbuttons {
+	font-size: 1.5em;
+	width: 2em;
+	height: 2em;
+	background-origin: border-box;
+	background-clip: border-box;
+	background-size: cover;
+	background-image: url(buttons.png);
+}
+#zoominbutton {background-position:  0 0;}
+#zoomoutbutton {background-position:  -2em 0;}
+#undobutton {background-position: -4em 0;}
+#redobutton {background-position: -6em 0;}
+#measurebutton {background-position: -8em 0;}
+#bodyviewerbutton {background-position: -10em 0;}
+
+.clicked {
+	background-color: #666666;
+}
+/* #redobutton { */
+	/* transform: matrix(-1, 0, 0, 1, 0, 0); */
+/* } */
+
+.rulerdiv {
+	text-shadow: 2px 2px 4px #f9f9f9, 2px 2px 4px #f9f9f9, -2px 2px 4px #f9f9f9, 2px -2px 4px #f9f9f9, 1px 1px 10px #f9f9f9, 0px 0px 10px #f9f9f9, 1px 0px 10px #f9f9f9;
+}
+
+
+
+.icon_in_text {
+	height:0.7em;
+	width:auto;
+	vertical-align: middle;
+}
+#clippy {
+	position:absolute;
+	right:0px;
+	bottom:0px;
+}
+.rederror {
+	background: red;
+}

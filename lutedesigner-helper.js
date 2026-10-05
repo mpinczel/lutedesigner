@@ -26,7 +26,18 @@ var features = []; // To be run at makedrawing(). push new features that should 
 function getlast(ar){
 	return ar[ar.length-1];
 }
-
+function penult(ar){
+	try {
+		return ar[ar.length-2];
+	}catch (e) {
+		console.log("penult(): Attempted to access second to last array member, but it does not exist.");
+	}
+}
+function foreach(ar, func) {
+	for (var i=0; i < ar.length; i++){
+		func(ar[i]);
+	}
+}
 ///////////////////////////////////////////////////////////////////////////////
 // Debug
 ///////////////////////////////////////////////////////////////////////////////
@@ -46,9 +57,31 @@ function debug(what, father){
 	}
 	console.log(out);
 }
+function debugpath(p){
+	// TODO: Also needs to support relative paths
+	console.log("debugpath",p);
+	// Draw control points and points
+	var segs = interpretpath(extractpath(p.getAttribute("d")));
+	var parel = p.parentNode;
+	var prevp = segs[0];
+	for (var i=0; i < segs.length; i++){
+		var seg = segs[i];
+		if (seg.x && seg.y) drawcircle(parel, new Point(seg.x, seg.y), 1, REDSTYLE);
+		if (seg.x1 && seg.y1) {
+			drawcircle(parel, new Point(seg.x1, seg.y1), 1, BLUESTYLE);
+			drawline(parel, [new Point(prevp.x, prevp.y),new Point(seg.x1, seg.y1)], THINBLUE);
+		}
+		if (seg.x2 && seg.y2) {
+			drawcircle(parel, new Point(seg.x2, seg.y2), 1, BLUESTYLE);
+			drawline(parel, [new Point(seg.x, seg.y),new Point(seg.x2, seg.y2)], THINBLUE);
+		}
+		prevp = segs[i];
+	}
+}
 ///////////////////////////////////////////////////////////////////////////////
 // JS and SVG related helper functions
 ///////////////////////////////////////////////////////////////////////////////
+// Point is the workhorse of Lute Designer. There's no harm in packing extra fields, like i or angle in a Point, but usually it only has x and y, maybe z too.
 function Point(cx,cy, cz){
 	// Point class for easier drawing
 	this.x = cx || 0.0;
@@ -56,6 +89,7 @@ function Point(cx,cy, cz){
 	if (cz !== undefined) this.z = cz;
 	return this;
 }
+
 function Circle(cp, radius){
 	// circle class, contains center point and radius
 	this.iscircle = true;
@@ -74,12 +108,12 @@ function intersect_circle_above(c1,c2){
 	var h = Math.sqrt(c1.r**2 - l**2);
 	var ix = (l/d)*(c2.x-c1.x) - (h/d)*(c2.y-c1.y) + c1.x;
 	var iy = (l/d)*(c2.y-c1.y) + (h/d)*(c2.x-c1.x) + c1.y;
-	console.log(ix,iy);
+	// console.log(ix,iy);
 	return new Point(ix,iy);
 }
-
 function intersect_circle(c1,c2){
 	// intersect two circle objects
+	// console.log("intersecting circles",c1.x,c1.y,c2.x,c2.y);
 	var d = Math.sqrt((c1.x-c2.x)**2 + (c1.y-c2.y)**2); // distance between circle centers
 	if (d > c1.r + c2.r){console.log("circles don't touch");return false;} // 
 	if (d == 0 && c1.r == c2.r){console.log("same circle");return false;} // 
@@ -90,14 +124,44 @@ function intersect_circle(c1,c2){
 	var h = Math.sqrt(c1.r**2 - a**2); // distance to intersection from line connecting centers
 	// var bp = c2.sub(c1).scale(a/d).add(c1); // point between circles
 	var xb = c1.x + a * (c2.x-c1.x) / d;
-	var yb = c1.y + a * (c2.y-c1.y) / d;
-	
+	var yb = c1.y + a * (c2.y-c1.y) / d; // xb,yb is exactly between intersections
+	// console.log(xb,yb,d);
 	var x3 = xb + h*(c2.y - c1.y)/d;
 	var y3 = yb - h*(c2.x - c1.x)/d;
 	var x4 = xb - h*(c2.y - c1.y)/d;
 	var y4 = yb + h*(c2.x - c1.x)/d;
 	
 	return [new Point(x3,y3), new Point(x4,y4)];
+}
+function circle_line(c, p1, p2,bounds){ // Intersect line with circle. bounds does nothing
+	// 
+	if (bounds === undefined) bounds = false;
+	if (p1.x==p2.x && Math.abs(p1.x-c.x) < c.r){ // TODO: Check distance logic
+		// return point on both positive and negative semicircle
+		var inter1 = new Point(p1.x, Math.sqrt(c.r**2-(p1.x-c.x)**2)+c.y);
+		var inter2 = new Point(p1.x, Math.sqrt(c.r**2-(p1.x-c.x)**2)+c.y);
+		return [inter1,inter2];
+	}
+	var m = (p2.y-p1.y)/(p2.x-p1.x);
+	var u = (p1.y-c.y) - m*(p1.x-c.x);
+	var a = m**2+1;
+	var b = 2*u*m;
+	var x1 = (-b+Math.sqrt(b**2-4*a*(u**2-c.r**2))) / (2*a) + c.x;
+	var x2 = (-b-Math.sqrt(b**2-4*a*(u**2-c.r**2))) / (2*a) + c.x;
+	var y1 = m*(x1 - p1.x) + p1.y;
+	var y2 = m*(x2 - p1.x) + p1.y;
+	// Check if inside line points
+	console.log("circle inters",x1,x2);
+	var out=[];
+	// if (!bounds) {
+		// out.push(new Point(x1,y1));
+		// out.push(new Point(x2,y2));
+	// } else {
+		if (isbetween(p1.x, x1, p2.x)) out.push(new Point(x1,y1));
+		if (isbetween(p1.x, x2, p2.x)) out.push(new Point(x2,y2));
+	// }
+	
+	return out;
 }
 
 Point.prototype.move = function (movex,movey,movez){
@@ -121,6 +185,7 @@ Point.prototype.move = function (movex,movey,movez){
 
 Point.prototype.addpoint = function (newpoint){
 	// Add coordinates of another point object to old coordinates and return new Point
+	if (newpoint===undefined) return this;
 	// return new Point(this.x+newpoint.x,this.y+newpoint.y);
 	return this.move(newpoint.x,newpoint.y,newpoint.z);
 }
@@ -136,11 +201,14 @@ Point.prototype.flip = function (){
 	this.x = y;
 	this.y = oldx;
 }
-Point.prototype.rotate = function (rotpoint,angle){
-	// TODO: Rotate around specified rotation point
-	var oldx = this.x;
-	this.x = y;
-	this.y = oldx;
+Point.prototype.rotate = function (rotpoint,angle){ // TODO: not tested yet
+	// Rotate around specified rotation point
+	// TODO: Perhaps needs to check if angle is negative or this.x < rotpoint.x
+	var oa = Math.atan2((this.y-rotpoint.y),(this.x-rotpoint.x));//(rotpoint, this);
+	var r = linelength(this, rotpoint);
+	var x = rotpoint.x+r*Math.cos(oa-angle);
+	var y = rotpoint.y+r*Math.sin(oa-angle);
+	return new Point(x,y,this.z);
 }
 Point.prototype.scale = function (xscale,yscale,zscale){
 	// Multiply coordinates by scale
@@ -148,14 +216,14 @@ Point.prototype.scale = function (xscale,yscale,zscale){
 	var yscale = yscale || xscale;
 	var y = this.y*yscale;
 	if (this.isbezier){
-		console.log("scaling a bezier");
+		// console.log("scaling a bezier");
 		var x1 = (this.x1 - this.x)*xscale;
 		var x2 = (this.x2 - this.x)*xscale;
 		var y1 = (this.y1 - this.y)*yscale;
 		var y2 = (this.y2 - this.y)*yscale;
 		return new Point(x,y).relbezier(x1,y1,x2,y2);
 	}
-	if (this.z){
+	if (this.z !== undefined){
 		var zscale = zscale || yscale;
 		var z = this.z*zscale;
 		return new Point(x,y,z);
@@ -164,7 +232,15 @@ Point.prototype.scale = function (xscale,yscale,zscale){
 	}
 	
 }
-
+Point.prototype.avg = function (p2 ,w) { // average / middle of two Points. Also weighted avg.
+	// var w = w || 0.5;
+	if (w === 0) return this.move(0);
+	if (w === undefined) var w = 0.5;
+	
+	var m = 1-w;
+	var z = (m*(this.z ? this.z: 0) + w*(p2.z ? p2.z: 0));
+	return new Point((m*this.x+w*p2.x),(m*this.y+w*p2.y),z);
+}
 
 /* Point.prototype.movedist = function (dist,angle, around_axis){
 	// Move from point coordinates by a certain length and angle and return new point
@@ -203,19 +279,82 @@ Point.prototype.moveangle = function (dist,angle){
 						-dist*Math.sin(angle-1.5*Math.PI));
 	}
 }
+Point.prototype.move3d = function (yaw, pitch, dist){
+	// Yaw = angle around y
+	// Pitch angle around x
+	var Px = dist * Math.sin(yaw) * Math.cos(pitch);
+	var Py = dist * Math.sin(pitch);
+	var Pz = dist * Math.cos(yaw) * Math.cos(pitch);
+	return this.move(Px, Py, Pz);
+}
+Point.prototype.vectormove = function (dist,v){ // gets angles for and uses move3d()
+	// Yaw = angle around y
+	var yaw = trueangle(this.xz(), v.xz());
+	// Pitch angle around x
+	var pitch = trueangle(this.yz(), v.yz());
+	return this.move3d(yaw, -pitch, dist);
+}
+Point.prototype.unitvector = function (){
+	// Get unit vector from Point interpreted as origin-to-point vector
+	var m = Math.sqrt((this.x || 0.0)**2 
+					+ (this.y || 0.0)**2 
+					+ (this.z || 0.0)**2); // norm or magnitude
+	return new Point(this.x/m,this.y/m,this.z/m);
+}
 
+Point.prototype.vectorgrow = function (dist, midp){
+	// Move dist away from Point in the direction away from origin
+	var midp = midp || new Point(0,0,0);
+	var x = this.x - midp.x;
+	var y = this.y - midp.y;
+	var z = this.z - midp.z;
+	var m = Math.sqrt(x**2 + y**2 + z**2); // norm or magnitude
+	return this.move(dist*x/m,
+					 dist*y/m,
+					 dist*z/m);
+}
+
+Point.prototype.zy = function (){ // Reorder dimensions
+	return new Point(this.z || 0.0, this.y || 0.0);
+}
+Point.prototype.yz = function (){ // Reorder dimensions
+	return new Point(this.y || 0.0, this.z || 0.0);
+}
+Point.prototype.xz = function (){ // Reorder dimensions
+	return new Point(this.x || 0.0, this.z || 0.0);
+}
+Point.prototype.zx = function (){ // Reorder dimensions
+	return new Point(this.z || 0.0, this.x || 0.0);
+}
+Point.prototype.xzy = function (){ // Reorder dimensions
+	return new Point(this.x || 0.0, this.z || 0.0, this.y || 0.0);
+}
+
+Point.prototype.setx = function (v){ // Change one coordinate, return new Point
+	return new Point(v, this.y, this.z);
+}
+Point.prototype.sety = function (v){
+	return new Point(this.x, v, this.z);
+}
+Point.prototype.setz = function (v){
+	return new Point(this.x, this.y, v);
+}
 // These objects only have enough data for drawing paths if the starting point is known
 Point.prototype.bezier = function (cp1,cp2){
 	// Convert this point into a bezier object
-	this.isbezier = true;
-	this.x1 = cp1.x;
-	this.y1 = cp1.y;
-	this.x2 = cp2.x;
-	this.y2 = cp2.y;
+	var np = new Point(this.x, this.y);
+	np.isbezier = true;
+	np.x1 = cp1.x;
+	np.y1 = cp1.y;
+	np.x2 = cp2.x;
+	np.y2 = cp2.y;
 	
-	return this;
+	// return this;
+	
+	
+	return np;
 }
-
+// TODO: return new point instead of changing this
 Point.prototype.relbezier = function (x1,y1,x2,y2){
 	// Convert this point into a bezier object using coordinates relative to the end node
 	this.isbezier = true;
@@ -283,6 +422,23 @@ Point.prototype.arc = function (rx, ry, xrot, largearc, sweep){
 	
 	return this;
 }
+Point.prototype.flipsign = function (axis) {
+	if (axis=="x"){
+		if (this.z === undefined){
+			return new Point(-this.x, this.y);
+		} else {
+			return new Point(-this.x, this.y, this.z);
+		}
+	} else if (axis=="y"){
+		if (this.z === undefined){
+			return new Point(this.x, -this.y);
+		} else {
+			return new Point(this.x, -this.y, this.z);
+		}
+	} else if (axis=="z"){
+		return new Point(this.x, this.y, -this.z || 0.0);
+	} 
+}
 
 function Arc (center,radius,a1,a2){
 	// Create Arc object. Default is the above X axis part of the unit circle centered at origin.
@@ -292,8 +448,9 @@ function Arc (center,radius,a1,a2){
 	this.a1 = a1 || Math.PI/2*3;
 	this.a2 = a2 || Math.PI/2;
 }
-arctobezier = function (p1,p2,radius_or_center, clockwise, largearc){
-	if (largearc) console.log("arctobezier: largearc is not implemented yet but it shouldn't be too hard to do.");
+arctobezier = function (p1,p2,radius_or_center, clockwise, largearc,segments){
+	if (largearc) console.log("arctobezier: largearc is not implemented yet but it shouldn't be too hard to do.",p1,p2,radius_or_center, clockwise, largearc,segments);
+	var segments = segments || 1 ; // returns an array of bezier segments if larger than 1
 	// TODO: method for using center point sometimes fails
 	// Always returns an array of bezier objects
 	// Perfect circle quadrant as a bezier command, radius 100:
@@ -352,6 +509,7 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc){
 		// a1 += Math.PI*2;
 	// }
 	var angledelta = a2-a1; // Size of arc in radians
+	var maxsegangle = angledelta/segments;
 	// console.log(!clockwise);
 	if (!clockwise) {angledelta = 2*Math.PI - angledelta;}
 	// TODO: if clockwise and angledelta = a2-a1 ==> largesweep
@@ -372,54 +530,52 @@ arctobezier = function (p1,p2,radius_or_center, clockwise, largearc){
 			// var cp2 = endp.moveangle(cple, ca2+0.5*Math.PI);
 		// }
 		
-		// drawcircle(getelid("frontview"), startp, 1, PURPLESTYLE);
-		// drawcircle(getelid("frontview"), cp1, 1, GREENSTYLE);
-		// drawshape(getelid("frontview"),[startp,cp1],GREENSTYLE);
-		// drawcircle(getelid("frontview"), cp2, 1, BLUESTYLE);
-		// drawshape(getelid("frontview"),[endp,cp2],BLUESTYLE);
+		// drawcircle(getelid("drawing"), startp, 1, PURPLESTYLE);
+		// drawcircle(getelid("drawing"), cp1, 10, GREENSTYLE);
+		// drawshape(getelid("drawing"),[startp,cp1],GREENSTYLE);
+		// drawcircle(getelid("drawing"), cp2, 10, BLUESTYLE);
+		// drawshape(getelid("drawing"),[endp,cp2],BLUESTYLE);
 		outp.push(endp.bezier(cp1,cp2));
 		// console.log("makesegment",ang,ca1,ca2,cple,cp1,cp2);
 		
 	}
 	// Split arc into max 90deg segments
 	var dir = 1;
-	if (!clockwise ) dir = -1; // && largearc ???
+	// if (!clockwise ) dir = -1; // && largearc ???
 	var incr_a = 0.5*Math.PI;
+	if (incr_a > maxsegangle) incr_a = maxsegangle;
 	var cur_a = incr_a;
 	var curp = p1;
 	var endp;
-	while (cur_a < angledelta){
+	var seg = 0;
+	while (cur_a < angledelta && seg < segments ){
 		// Calculate a point along the circle
 		// console.log("in while",cur_a, angledelta);
 		var endp = center.moveangle(radius, a1+cur_a*dir);
 		makesegment(curp,endp,incr_a);
 		cur_a += incr_a;
 		curp = endp;
+		seg++;
 	}
 	// Make the last segment from curp to p2. This might also be the only one that gets made, if the specified arc was less than 90deg
-	makesegment(curp, p2,angledelta-cur_a+incr_a);
+	if (clockwise ) {
+		// TODO: Dropping this looses last segment sometimes, but perhaps makes an unnecessary one sometimes?
+		makesegment(curp, p2,angledelta-cur_a+incr_a);
+	} else {
+		// makesegment(curp, p2,angledelta+cur_a-incr_a);
+	}
+	
 	// console.log("final angles",angledelta,cur_a,incr_a);
 	// console.log("outp",outp);
 	return outp;
 }
-
-Point.prototype.flipsign = function (axis) {
-	if (axis=="x"){
-		if (this.z === undefined){
-			return new Point(-this.x, this.y);
-		} else {
-			return new Point(-this.x, this.y, this.z);
-		}
-	} else if (axis=="y"){
-		if (this.z === undefined){
-			return new Point(this.x, -this.y);
-		} else {
-			return new Point(this.x, -this.y, this.z);
-		}
-	} else if (axis=="z"){
-		return new Point(this.x, this.y, -this.z || 0.0);
-	} 
+function arclinedev(p1,p2,deviation, clockwise, segments){
+	// Draw arc (consisting of bezier segments) between points defined by deviation from a straight line.
+	// Returns an array of Bezier objects
+	var radius = deviation + (linelength(p1, p2)**2 - 4*deviation**2)/(8*deviation);
+	return arctobezier(p1,p2,radius, clockwise, false, segments);
 }
+
 function normangle(p1,p2){
 	// Normalized angle function where north is 0 and + is clockwise
 	var x = Math.abs(p2.x - p1.x);
@@ -440,9 +596,15 @@ function normangle(p1,p2){
 	}
 	
 }
-function getangle(p1,p2){
+function getangle(p1,p2){ // rather use trueangle
 	// return Math.atan2(p1,p2);
 	return Math.atan((p1.x-p2.x)/(p1.y-p2.y));
+}
+// TODO: Replace all instances of getangle with trueangle
+function trueangle(p1,p2){
+	// This replaces getangle, except does all angles correctly.
+	// Due to convention, starts from zero at North and goes positive counter-clockwise
+	return -Math.PI/2-Math.atan2((p2.y-p1.y),(p2.x-p1.x));
 }
 function linelength(p1,p2){
 	if (p1 === undefined || p2 === undefined) return undefined;
@@ -456,15 +618,119 @@ function linelength(p1,p2){
 	} else if (p2.z === undefined && !(p1.z === undefined)){
 		return Math.sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2 + (0-p1.z)**2);
 	} else {
+		// console.log("linelength has z",p1,p2);
 		return Math.sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2 + (p2.z-p1.z)**2);
 	}
 }
 
-function flatlinelength(p1,p2){
-	// Ignore z coordinates
+function flatlinelength(p1,p2){// Ignore z coordinates
+	
 	return Math.sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2);
 }
+function midpoint(p1,p2){
+	// TODO: Z axis
+	return new Point((p1.x+p2.x)/2, (p1.y+p2.y)/2);
+}
+function line_x_from_y(p1,p2, y){
+	var m = (p2.y-p1.y)/(p2.x-p1.x);
+	return new Point(p1.x+ (y-p1.y)/m, y);
+}
+function line_y_from_x(p1,p2, x){
+	var m = (p2.y-p1.y)/(p2.x-p1.x);
+	return new Point(x, m*(x-p1.x)+p1.y);
+}
+function line_from_z(p1,p2, z){ // 3D line intersection with z plane
+	var m1 = (p2.z-p1.z)/(p2.y-p1.y);
+	var m2 = (p2.z-p1.z)/(p2.x-p1.x);
+	return new Point(p1.x+ (z-p1.z)/m2, p1.y+ (z-p1.z)/m1, z);
+}
+function circle_tangent(p,c){ // find point on line tangent to circle given point on line
+	// from math import sqrt
+	// # Data Section, change as you need #
+	// Cx, Cy = -2, -7                    #
+	// r = 5                              #
+	// Px, Py =  4, -3                    #
+	// # ################################ #
+	// dx, dy = Px-Cx, Py-Cy
+	var dx = p.x-c.x;
+	var dy = p.y-c.y
+	// dxr, dyr = -dy, dx
+	var dxr = -dy;
+	var dyr = dx;
+	// d = sqrt(dx**2+dy**2)
+	var d = Math.sqrt(dx**2 + dy**2);
+	// if d >= r :
+	if (d >= c.r){
+		// rho = r/d
+		var rho = c.r/d;
+		// ad = rho**2
+		var ad = rho**2;
+		// bd = rho*sqrt(1-rho**2)
+		var bd = rho*Math.sqrt(1-rho**2)
+		// T1x = Cx + ad*dx + bd*dxr
+		var T1x = c.x + ad*dx + bd*dxr;
+		// T1y = Cy + ad*dy + bd*dyr
+		var T1y = c.y + ad*dy + bd*dyr;
+		// T2x = Cx + ad*dx - bd*dxr
+		var T2x = c.x + ad*dx - bd*dxr;
+		// T2y = Cy + ad*dy - bd*dyr
+		var T2y = c.y + ad*dy - bd*dyr;
+		// console.log("tangent",T1x, T1y ,T2x, T2y);
+		return [new Point(T1x, T1y), new Point(T2x, T2y)];
 
+		// print('The tangent points:')
+		// print('\tT1≡(%g,%g),  T2≡(%g,%g).'%(T1x, T1y, T2x, T2y))
+		// if (d/r-1) < 1E-8:
+			// print('P is on the circumference')
+		// else:
+			// print('The equations of the lines P-T1 and P-T2:')
+			// print('\t%+g·y%+g·x%+g = 0'%(T1x-Px, Py-T1y, T1y*Px-T1x*Py))
+			// print('\t%+g·y%+g·x%+g = 0'%(T2x-Px, Py-T2y, T2y*Px-T2x*Py))
+	// else:
+	} else {
+		
+		return false;
+		// print('''\
+	// Point P≡(%g,%g) is inside the circle with centre C≡(%g,%g) and radius r=%g.
+	// No tangent is possible...''' % (Px, Py, Cx, Cy, r))
+	}
+}
+function circle_circle_tangent(c1, c2) {
+    var tangents = [];
+    
+    // Calculate the distance between the centers of the two circles
+    var d = Math.sqrt(Math.pow(c2.x - c1.x, 2) + Math.pow(c2.y - c1.y, 2));
+     
+    // Check if one circle is inside the other; d+r2 < r1 || d+r1 < r2
+    if (d < Math.max(c1.r, c2.r)) {
+        // Circles are either disjoint or one is contained within the other, no common tangents
+        console.log("Circles inside each other",d);
+		return false;
+    }
+    
+    // Compute the angle between the centers of the circles
+    var angle = Math.atan2(c2.y - c1.y, c2.x - c1.x);
+    
+    // Compute the angles of the tangents from the center of each circle
+    var alpha1 = Math.acos((c1.r - c2.r) / d);
+    // var alpha2 = Math.acos((c1.r + c2.r) / d);
+    
+    // Calculate the points where the tangents intersect with each circle
+    var p1 = new Point(c1.x + c1.r * Math.cos(angle + alpha1),
+					   c1.y + c1.r * Math.sin(angle + alpha1));
+    var p2 = new Point(c1.x + c1.r * Math.cos(angle - alpha1),
+					   c1.y + c1.r * Math.sin(angle - alpha1));
+    var p3 = new Point(c2.x + c2.r * Math.cos(angle + alpha1),
+					   c2.y + c2.r * Math.sin(angle + alpha1));
+    var p4 = new Point(c2.x + c2.r * Math.cos(angle - alpha1),
+					   c2.y + c2.r * Math.sin(angle - alpha1));
+    
+    // Add the intersection points to the array of tangents
+    tangents.push( p2, p4, p1, p3);
+    // tangents.push([  ]);
+    
+    return tangents;
+}
 
 Point.findmax = function(array,coord,minmax){ 
 	// find coordinate in an array of points, return index
@@ -494,7 +760,7 @@ Point.findmax = function(array,coord,minmax){
 	return maxcounter;
 }
 /////////////////////////////////////////////////////////////
-
+// TODO: Remove neckbeardlib functions here and use .js in root folder
 function getelid(id){
 	if (id){
 		return document.getElementById(id);
@@ -502,22 +768,33 @@ function getelid(id){
 		return false;
 	}
 }
-
 function delelid(elid){
 	var d = document.getElementById(elid);
 	delel(d);
 }
 function delel(el){
+	// console.log(el);
 	if (el){el.parentNode.removeChild(el);}
 }
 function addel(to,newel){
 	to.appendChild(newel);
+	return newel;
 }
 function addelafter(to,newel){
 	to.parentNode.insertBefore(newel, to.nextSibling);
+	return newel;
 }
 function addelbefore(to,newel){
 	to.parentNode.insertBefore(newel, to);
+	return newel;
+}
+function makefirst(el) {
+	el.parentNode.insertBefore(el, el.parentNode.firstElementChild);
+	return el;
+}
+function addelfirst(to,newel) {
+	to.insertBefore(newel, to.firstElementChild);
+	return newel;
 }
 function delchildren(el){
 	while (el.children.length>0){
@@ -560,8 +837,25 @@ function creel_empty(tagname, id, cla, attrs, NS){
 	}
 	return creel(tagname, id, cla, attrs, NS, true);
 }
+
+function create_select_options(el, obj,selected){ // Fill html select tag with options from object
+	
+	delchildren(el);
+	var newoption = creel("option", "", "", ["value", "select"]);
+	newoption.innerHTML = "Select...";
+	addel(el, newoption);
+	
+	var names = Object.getOwnPropertyNames(obj);
+	for (var i=0; i<names.length; i++){
+		var newoption = creel("option", "", "", ["value", names[i]]);
+		newoption.innerHTML = names[i];
+		addel(el, newoption);
+		if (names[i] == selected) newoption.selected=true;
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////////
-// 
+// SVG element insertion
 function insert_drawing(fromsvg, id, togroup, topoint, rotate, rotpoint){
 	// Insert an svg group from technical drawing presets into the drawing
 	var fromsvg = fromsvg || getelid("svg-general").getSVGDocument();
@@ -574,8 +868,8 @@ function insert_drawing(fromsvg, id, togroup, topoint, rotate, rotpoint){
 	
 	var t = "translate("+topoint.x+" "+topoint.y+")";
 	if (rotate) {
-		var rotpoint = rotpoint || new Point(0,0)
-		t += "rotate("+rotate+" "+(rotpoint.x) +" "+(rotpoint.y) +")";
+		// var rotpoint = rotpoint || new Point(0,0)
+		t += " rotate("+rotate+")";
 	}
 	item.setAttribute("transform", t);
 	
@@ -583,13 +877,55 @@ function insert_drawing(fromsvg, id, togroup, topoint, rotate, rotpoint){
 	return item;
 }
 
+function drawpeg(gr, stempos, shank, angle,style){
+	// shank is [Point, Point] representing visible part of shank inside pegbox, or null
+	// Peg sticks out 37mm usually
+	try {
+	if (editorstate.pegboxstyle != "renaissance"){
+		var p = insert_drawing(null, "peg-baroque", gr, stempos, angle/radtodeg, new Point(0,0));
+	} else {
+		var p = insert_drawing(null, "peg-renaissance", gr, stempos, angle/radtodeg, new Point(0,0));
+	}
+	p.setAttribute("style", style || PEGSTYLE);
+	if (shank  !== null){
+	var startw = (7.11 - linelength(stempos, shank[0])/30) * 0.5;
+	var endw = (7.11 - linelength(stempos, shank[1])/30) * 0.5;
+
+	drawline(gr, [shank[0].move(startw*Math.cos(angle),startw*Math.sin(angle)), 
+			      shank[1].move(endw*Math.cos(angle),endw*Math.sin(angle))], PEGSTYLE);
+	drawline(gr, [shank[0].move(-startw*Math.cos(angle),-startw*Math.sin(angle)), 
+			      shank[1].move(-endw*Math.cos(angle),-endw*Math.sin(angle))], PEGSTYLE);
+	}
+	} catch (e){
+		console.log("peg insertion failed",e);
+	}
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Functions for paths
 //////////////////////////////////////////////////////////////////////////////
 
+function xz(ar){ // convert array of points xz --> xy
+	var out = [];
+	for (var i=0; i < ar.length; i++){
+		if (ar[i] !== undefined) out.push(ar[i].xz());
+	}
+	return out;
+}
+function zy(ar){ // convert array of points xz --> xy
+	var out = [];
+	for (var i=0; i < ar.length; i++){
+		if (ar[i] !== undefined) {
+			out.push(ar[i].zy());
+		}
+	}
+	return out;
+}
+
 function drawline (c,points, style,id){
 	// Method for svg paths
+	try {
 	var d = "M"+points[0].x.toFixed(DIGITS)+","+points[0].y.toFixed(DIGITS)+" L"+points[1].x.toFixed(DIGITS)+","+points[1].y.toFixed(DIGITS);
 	var p = creel("path", id, "", ["d",d], NAMESPACE);
 	if (style){
@@ -599,9 +935,10 @@ function drawline (c,points, style,id){
 	}
 	addel(c, p);
 	return p;
+	}catch(e){console.log("Error drawing line",e);}
 }
-
 function drawarc (c, p1, p2, rx,ry, xrot, largearc, sweep, style, id){
+	try{
 	var ry = ry || rx;
 	var xrot = xrot || 0;
 	var largearc = largearc || 0;
@@ -617,30 +954,51 @@ function drawarc (c, p1, p2, rx,ry, xrot, largearc, sweep, style, id){
 	}
 	addel(c, p);
 	return p;
+	}catch(e){console.log("Error drawing arc",e);}
 }
-
-
 function drawshape(c, points,style,id, z){
+	try{
 	if (z === undefined) z = true;
 	// Draw path composed of many straight line segments, z= close path
 	// Or beziers with two control points
-	if (!points || !points[0]) {console.log("drawshape: points[0] is empty");return;}
-	var d = "M"+points[0].x.toFixed(DIGITS)+","+points[0].y.toFixed(DIGITS);
-	for (var i = 1; i< points.length; i++){
-		if (!points[i]) {console.log("drawshape: points["+i+"] is empty");return;}
-		if (points[i].isbezier){ // Bezier if 
+	// If one or more null values are encountered in points, they are interpreted as a move command to the next non-null point.
+	// if (!points || !points[0]) {console.log("drawshape: points[0] is empty");return;}
+	// Find first non-null point to use as first move command
+	var d = "";
+	for (var istart = 0; istart< points.length; istart++){
+		if (points[istart]){
+			d = "M"+points[istart].x.toFixed(DIGITS)+","+points[istart].y.toFixed(DIGITS);
+			break;
+		}
+	}
+	for (var i = istart+1; i< points.length; i++){
+		var doM = false;
+		if (!points[i]) {
+			// console.log("drawshape: points["+i+"] is empty, skipping");
+			doM = true;
+			while(!points[i] && i< points.length){
+				i++;
+			}
+			
+		}
+		if (points[i] && points[i].isbezier){ // Bezier if 
 			d += " C"+points[i].x1.toFixed(DIGITS)+","+points[i].y1.toFixed(DIGITS) +" "
 					 +points[i].x2.toFixed(DIGITS)+","+points[i].y2.toFixed(DIGITS) +" "
 					 +points[i].x.toFixed(DIGITS) +","+points[i].y.toFixed(DIGITS)  +" ";
-		} else if (points[i].isarc){
+		} else if (points[i] && points[i].isarc){
 			d += " A"+points[i].rx.toFixed(DIGITS)+","
 					+points[i].ry.toFixed(DIGITS)+ " " 
 					+ points[i].xrot + " " + points[i].largearc 
 					+ "," + points[i].sweep + " " 
 					+points[i].x.toFixed(DIGITS)+","
 					+points[i].y.toFixed(DIGITS);
-		} else {
-			d += " L"+points[i].x.toFixed(DIGITS)+","+points[i].y.toFixed(DIGITS);
+		} else if (points[i]) {
+			if (doM) {
+				d += " M"+points[i].x.toFixed(DIGITS)+","+points[i].y.toFixed(DIGITS);
+			} else {
+				d += " L"+points[i].x.toFixed(DIGITS)+","+points[i].y.toFixed(DIGITS);
+			}
+			
 		}
 		
 	}
@@ -654,8 +1012,31 @@ function drawshape(c, points,style,id, z){
 	}
 	addel(c, p);
 	return p;
+	}catch(e){console.log("Error drawing shape",e);}
+}
+function mirrorshape(c, rpoints,style,id, z){ // mirrors and joins path around y
+	var lpoints = [];
+	for (var i=0; i<rpoints.length; i++){
+		var p = rpoints[i];
+		// TODO: Handle beziers by moving bezier data to next point
+		
+		// Check if next point is an arc, copy arc data to current point
+		// TODO: Do same for beziers
+		if (rpoints[i+1] && rpoints[i+1].isarc){
+			// console.log("Mirroring arc", rpoints[i+1]);
+			lpoints.push(new Point(-p.x, p.y).arc(rpoints[i+1].rx, rpoints[i+1].ry, rpoints[i+1].xrot, rpoints[i+1].largearc, rpoints[i+1].sweep));
+			// console.log("Mirroring arc", getlast(lpoints));
+		} else {
+			lpoints.push(new Point(-p.x, p.y));
+		}
+
+	}
+	lpoints.reverse();
+	rpoints = lpoints.concat(rpoints);
+	return drawshape(c, rpoints,style,id, z);
 }
 function drawshaperel(c, points,style,id, z){
+	try{
 	if (z === undefined) z = true;
 	// Draw path composed of many straight line segments, z= close path
 	// Or beziers with two control points
@@ -691,22 +1072,10 @@ function drawshaperel(c, points,style,id, z){
 	}
 	addel(c, p);
 	return p;
-}
-function drawpolygon (c, points,style,id){
-	var poi="";
-	for (var i = 0; i< points.length; i++){
-		poi += " "+points[i].x.toFixed(DIGITS)+","+points[i].y.toFixed(DIGITS);
-	}
-	var p = creel("polygon",id, "", ["points",poi], NAMESPACE);
-	if (style){
-		p.setAttribute("style",style);
-	} else {
-		p.setAttribute("style",THINSTYLE);
-	}
-	addel(c, p);
-	
+	}catch(e){console.log("Error drawing relative shape",e);}
 }
 function drawtext(c, point, inner, style,id){
+	try{
 	var t = creel("text",id,"",["x",point.x.toFixed(DIGITS),"y",point.y.toFixed(DIGITS)], NAMESPACE);
 	if (style){
 		t.setAttribute("style",style);
@@ -716,8 +1085,10 @@ function drawtext(c, point, inner, style,id){
 	t.innerHTML = inner;
 	addel(c, t);
 	return t;
+	}catch(e){console.log("Error drawing text",e);}
 }
 function drawrect(c, point, size, style,id){
+	try{
 	var t = creel("rect",id,"",
 		["x",point.x.toFixed(DIGITS),
 		"y",point.y.toFixed(DIGITS),
@@ -731,12 +1102,14 @@ function drawrect(c, point, size, style,id){
 	var c = c || getelid("debuglayer");
 	addel(c, t);
 	return t;
+	}catch(e){console.log("Error drawing rectangle",e);}
 }
 function drawcircle(c, point, radius, style,id){
+	try{
 	var t = creel("circle",id,"",
 		["cx",point.x.toFixed(DIGITS),
 		"cy",point.y.toFixed(DIGITS),
-		"r",radius.toFixed(DIGITS)], NAMESPACE);
+		"r",(point.iscircle ? point.r.toFixed(DIGITS) : radius.toFixed(DIGITS))], NAMESPACE);
 	if (style){
 		t.setAttribute("style",style);
 	} else {
@@ -746,9 +1119,50 @@ function drawcircle(c, point, radius, style,id){
 	var c = c || getelid("debuglayer");
 	addel(c, t);
 	return t;
+	}catch(e){console.log("Error drawing circle",e);}
 }
+function drawtriangle(c, point, edgew, dir, style,id){
+	try{
+	var d = "M "+(point.x)+" "+(point.y);
+	var p1 = point.movedist(edgew, dir-halfpi*0.5);
+	var p2 = point.movedist(edgew, dir+halfpi*0.5);
+	d+= "L "+(p1.x)+" "+(p1.y);
+	d+= "L "+(p2.x)+" "+(p2.y);
+	d+= "Z";
 
+	var t = creel("path", id, "", ["d",d], NAMESPACE);
+	if (style){
+		t.setAttribute("style",style);
+	} else {
+		t.setAttribute("style",BOXSTYLE);
+	}
+	
+	var c = c || getelid("debuglayer");
+	addel(c, t);
+	return t;
+	}catch(e){console.log("Error drawing triangle",e);}
+}
+function drawX(c, point, radius, style,id){
+	try{
+	var d = "M "+(point.x-radius)+" "+(point.y-radius);
+	d+= "L "+(point.x+radius)+" "+(point.y+radius);
+	d+= "M "+(point.x+radius)+" "+(point.y-radius);
+	d+= "L "+(point.x-radius)+" "+(point.y+radius);
+	
+	var t = creel("path", id, "", ["d",d], NAMESPACE);
+	if (style){
+		t.setAttribute("style",style);
+	} else {
+		t.setAttribute("style",BOXSTYLE);
+	}
+	
+	var c = c || getelid("debuglayer");
+	addel(c, t);
+	return t;
+	}catch(e){console.log("Error drawing X",e);}
+}
 function drawellipse(c, point, rx, ry, style,id){
+	try{
 	var t = creel("ellipse",id,"",
 		["cx",point.x.toFixed(DIGITS),
 		"cy",point.y.toFixed(DIGITS),
@@ -763,17 +1177,43 @@ function drawellipse(c, point, rx, ry, style,id){
 	var c = c || getelid("debuglayer");
 	addel(c, t);
 	return t;
+	}catch(e){console.log("Error drawing ellipse",e);}
 }
-function makegroup(c, groupname, inkscapelayer){
-	var p = creel("g", groupname, "", [], NAMESPACE);
-	if (inkscapelayer){
-		p.setAttribute("inkscape:label",inkscapelayer);
+function makegroup(c, groupname, translatep){
+	var p = creel("g", groupname, "", [], NAMESPACE, true);
+	if (translatep && translatep.hasOwnProperty("x") && translatep.hasOwnProperty("y")) { // Is a Point object or similar
+		p.setAttribute("transform","translate("+translatep.x+","+translatep.y+")");
+	} else if (translatep){ // Is name of inkscapelayer data
+		p.setAttribute("inkscape:label",translatep);
 		p.setAttribute("inkscape:groupmode","layer");
 	} 
 	addel(c, p);
 	return p;
 }
-
+function rotate(el, a){ // setAttribute(transform,rotate(a))
+	var orig = "";
+	if (el.getAttribute("transform") !== null) orig = el.getAttribute("transform");
+	el.setAttribute("transform", orig+" rotate("+a+")");
+	return el;
+}
+function translate(el, p){ // usually, translate first, then rotate
+	var orig = "";
+	if (el.getAttribute("transform") !== null) orig = el.getAttribute("transform");
+	el.setAttribute("transform", orig+" translate("+(p.x)+" "+p.y+")");
+	return el;
+}
+function parse_transform(hg){ // Only does translate
+	if (hg){
+		var tr = hg.getAttribute("transform");
+		console.log("transform",tr);
+		tr = tr.substr(tr.lastIndexOf("translate")).match(/\-*\d+\.*\d*/g); // returns array of any digit followed optionally by . and optional digits, after last "translate"
+		// "translate(944.09375 244.96612592592578)"
+		if (tr[0] && tr[1]){
+			return new Point(parseFloat(tr[0]),parseFloat(tr[1]));
+		}
+	}
+	return new Point(0,0);
+}
 function makeimage(to, id, source, pos,size, preserveAspectRatio){
 	// Make image tag
 	if (preserveAspectRatio === true) {preserveAspectRatio = "xMinYMin";}
@@ -782,131 +1222,321 @@ function makeimage(to, id, source, pos,size, preserveAspectRatio){
 	addel(to, p);
 	return p;
 }
+function drawhandles(g, points){ // Put inkscape like handles on path (not editable)
+	// points should be an array of arrays where ar[0] is the path point and ar[1] is the control point
+	for (var line of points){
+		drawline(g, line, BLUESTYLE);
+		drawcircle(g, line[1], 2, REDSTYLE);
+	}
+}
 
-function marklength (to, points, side){
+function movetext(t){ // Move text left by its width
+	var w = t.getBBox().width;
+	var x = parseFloat(t.getAttribute("x"));
+	// console.log("movetext",w,x, x-w);
+	t.setAttribute("x", x-w);
+}
+
+function marklength (group, fro, to, side){
 	// Do squigly curvy length marker on the drawing
+	var g = makegroup(group,"");
+	var mlength = flatlinelength(fro,to);
+	var mangle = trueangle(fro,to) + (side ? -1 : 1)*Math.PI/2; // default to the right
+	// console.log("Length to be marked:", mlength,mangle);
+	var midp = midpoint(fro,to);
+	var frocp = fro.movedist(10,mangle);
+	var tocp = to.movedist(10,mangle);
+	var midcp = midp.movedist(10,mangle);
 	
-	var mlength = Math.sqrt(Math.abs((points[1].x-points[0].x)**2+
-									 (points[1].y-points[0].y)**2));
-	var mangle = Math.atan((points[0].x-points[1].x)-(points[0].y-points[1].y));
-	// console.log("Folded length:", mlength);
+	drawtext(g, midcp.move(0,2), mlength.toFixed(0)+"mm", SMALLTEXT);
 	
-	/* var d = ["M", coords.x, coords.y];
-	d = d.concat(["C", sidex-60, exty4, sidex-70, exty4+10,sidex-68, exty4+30]);
-	d = d.concat(["L", sidex-25, sidey-10]); // Start off curve 
-	d = d.concat(["C", sidex-25, sidey+10, sidex-20, sidey+35, sidex, sidey+40]);
-
-	d = d.join(" ");
-	var extside = creel("path", "ext-side", "", ["d",d], NAMESPACE);
-	extside.setAttribute("style",COVERSTYLE);
-	addel(sideview, extside);	 */
-	
-	
+	var path = [
+		fro,
+		midcp.bezier(frocp, midp),
+		to.bezier(midp,tocp)
+	];
+	drawshape(g, path, MARKLENGTH,"", false)
 	
 }
 ///////////////////////////////////////////////////////////////////////////////
 // SVG Path and object operations
 ///////////////////////////////////////////////////////////////////////////////
+var pathsegtypes = {
+	"M":["x","y"],
+	"m":["x","y"],
+	"L":["x","y"],
+	"l":["x","y"],
+	"H":["x"],
+	"h":["x"],
+	"V":["y"],
+	"v":["y"],
+	"Z":[],
+	"z":[],
+	"C":["x1","y1","x2","y2","x","y"],
+	"c":["x1","y1","x2","y2","x","y"],
+	"A":["r1","r2","angle","largeArcFlag","sweepFlag","x","y"],
+	"a":["r1","r2","angle","largeArcFlag","sweepFlag","x","y"]
 
-
+};
+function getseglist (path){ // Use this to get SVG path segments
+	return interpretpath(extractpath(path.getAttribute("d")));
+}
+function saveseglist(path, seglist){
+	path.setAttribute("d", makedtext(seglist));
+	return path;
+}
 function extractpath(d){
 	// returns path as an array of command letters with their coords
+	// Usage: var seglist = interpretpath(extractpath(path.getAttribute("d")));
+	// Or just use getseglist();
+	// Save: newpath.setAttribute("d",makedtext(seglist));
+	// TODO: Legally omitted segment type letters cause many segments to be lumped together; De-lumpify here.
+	// TODO: This probably breaks circle arc segments; Add capability
+	// d = d.replace(/\s+/g, " "); // Normalize whitespace
+	// console.log("extract",d);
 	var ltrs = "MmCcLlHhVvZzSsQqTtAa";
+	var p = pathsegtypes;
+	
+	var nmbrs = "0123456789-.";
 	var output = [];
-	var j = -1;
-	var numbers= "";
+	var numbers= [];
+	
 	for (var i=0; i < d.length; i++){
-		if (ltrs.indexOf(d[i]) >= 0){
-			// is command letter, start new object and put numberbuffer in previous command
-			if (output[j]){
-				output[j]["numbers"] = numbers;
-				// empty number buffer
-				numbers="";
-			}
-			j++;
-			output[j] = {"letter": d[i], "numbers": ""};
+	// while (i < d.length) {
+		if (ltrs.indexOf(d[i]) >= 0 ){
+			// Letter begins a new segment
+			var seg = {"letter": d[i] , "numbers": [] };
+			output.push(seg);
 			
-		} else {
-			numbers += d[i];
-		}
-	}
-	if (numbers){output[j]["numbers"] = numbers;}
-	// Break numbers apart into objects
-	for (var i=0; i < output.length; i++){
-		function strip(str) {
-			return str.replace(/^\s+|\s+$/g, '');
-		}
-		var t = strip(output[i]["numbers"].replace(/,/g," ")).split(" ");
-		for (var j=0; j < t.length; j++){
-			if (t[j]){
-				t[j] = parseFloat(t[j]);
+		} else if (nmbrs.indexOf(d[i]) >= 0 ){
+			// if character is a number-., seek end of number and store
+			var number = "";
+			while (i < d.length && nmbrs.indexOf(d[i]) >= 0 ){
+				number += d[i];
+				i++;
 			}
+			seg.numbers.push(parseFloat(number));
 		}
-		output[i]["numbers"] = t;
 	}
+	// De-lumpify segments; In case letters were omitted in the original path
+	var delumped = [];
+	for (var i=0; i < output.length; i++){
+		if (p[output[i].letter] && output[i].numbers.length > p[output[i].letter].length){
+			while(output[i].numbers.length){
+				delumped.push({"letter": output[i].letter , 
+					"numbers": output[i].numbers.splice(0,p[output[i].letter].length) });
+			}
+
+		} else {
+			delumped.push({"letter": output[i].letter, "numbers": output[i].numbers });
+		} 
+	}
+	
 	// console.log("extracted",output);
-	return output;
+	// console.log("delumped",delumped);
+	return delumped;
+}
+
+function interpretpath(d){ // TODO: misinterprets when coords omitted
+	// Turn numbers lists created by extractpath into full objects
+	var out=[];
+	// console.log("interpreting",d);
+	var p = pathsegtypes; // Global list of segment types and their attributes (x,y,x1,...)
+	for (var i=0; i < d.length; i++){
+		if (p[d[i].letter]){
+			var obj = {"letter": d[i].letter};
+			for (var j=0; j < d[i].numbers.length; j++){
+				obj[p[d[i].letter][j]] = d[i].numbers[j];
+			}
+			out.push(obj);
+		}
+	}
+	// console.log("interpreted as",out);
+	return out;
 }
 function makedtext(d){
 	// output usable d string for svg path
 	var output = "";
+	var p = pathsegtypes; // Global list of segment types and their attributes (x,y,x1,...)
+	// console.log("makedtext",d);
 	// incomplete
 	for (var i=0; i < d.length; i++){
-		output += d[i]["letter"]+ " ";
+		output += d[i].letter+ " ";
 		// console.log(d);
-		for (var j=0; j < d[i]["numbers"].length; j++){
-			output += d[i]["numbers"][j].toFixed(4)+ " "
+		// z commands don't have numbers
+		if (d[i].numbers){
+			if (d[i].numbers.length>1){
+				for (var j=0; j < d[i]["numbers"].length; j++){
+					// console.log(i,j,d[i]["numbers"][j]);
+					if (d[i]["numbers"][j] !== ""){
+						output += d[i]["numbers"][j].toFixed(4);
+					}
+
+					if (j%2==0){
+						output += ",";
+					}
+					output += " ";
+				}
+			// } else if ("HhVv".indexOf(d[i].letter)){
+			} else if (d[i].numbers.length==1){
+				// console.log("HHHHVVVV",d[i]);
+				output += d[i]["numbers"][0].toFixed(4);
+			} else {
+				// console.log("ZZZZZZZ",d[i]);
+				// output += d[i]["numbers"][0].toFixed(4);
+			}
+		} else { // An interpreted array
+			if (p[d[i].letter].indexOf("x1")>=0) output += d[i].x1.toFixed(4)+", ";
+			if (p[d[i].letter].indexOf("y1")>=0) output += d[i].y1.toFixed(4)+" ";
+			if (p[d[i].letter].indexOf("x2")>=0) output += d[i].x2.toFixed(4)+", ";
+			if (p[d[i].letter].indexOf("y2")>=0) output += d[i].y2.toFixed(4)+" ";
+			if (p[d[i].letter].indexOf("x")>=0) output += d[i].x.toFixed(4);
+			if (p[d[i].letter].indexOf("x")>=0 && p[d[i].letter].indexOf("y")>=0) output += ", ";
+			if (p[d[i].letter].indexOf("y")>=0) output += d[i].y.toFixed(4)+" ";
+			output += " ";
+			// TODO: Arc functionality
 		}
+		
 	}
 	return output;
 }
+function beautifypath(pel){
+	var seglist = getseglist(pel);
+	var text = "";
+	for (seg of seglist){
+		if ("MmLlHhVvZzCc".indexOf(seg.letter) >= 0){
+			text += seg.letter +" "+ seg.x.toFixed(2) +", "+ seg.y.toFixed(2);
+			if (seg.x1 && seg.y1) text += "\n "+ seg.x1.toFixed(2) +", "+ seg.y1.toFixed(2);
+			if (seg.x2 && seg.y2) text += "\n "+ seg.x2.toFixed(2) +", "+ seg.y2.toFixed(2);
+			text += "\n";
+		}
+	}
+	return text;
+}
+function pack_path(seglist){ // compress path for url storage
+	// compress numbers into bytes? Then base64
+	if (seglist.length == 0) return "";
+	console.log("pack",seglist);
+	var text = "";
+	for (seg of seglist){
+		if ("MmLlHhVvZzCc".indexOf(seg.letter) >= 0){
+			text += seg.letter +""+ seg.x.toFixed(2) +"t"+ seg.y.toFixed(2);
+			if (seg.x1 && seg.y1) text += "s"+ seg.x1.toFixed(2) +"t"+ seg.y1.toFixed(2);
+			if (seg.x2 && seg.y2) text += "s"+ seg.x2.toFixed(2) +"t"+ seg.y2.toFixed(2);
+		}
+	}
+	return text;
+}
+function makerelative_(el){
+	var d = extractpath(el.getAttribute("d"));
+	var segs = interpretpath(d);
+	console.log("seg list", segs);
+	// TODO: Convert to relative by substracting previous point
+	// console.log("abs in",path.getAttribute("d"));
+  var x0,y0,x1,y1,x2,y2;
+  for (var x=segs[0].x,y=segs[0].y,i=1; i<segs.length; ++i){
+    var seg = segs[i], c=seg.letter;
+    if (/[mlhvcsqta]/.test(c)){ // If is relative already
+      if ('x' in seg) x=seg.x;
+      if ('y' in seg) y=seg.y;
+    }else{ // if is absolute and needs converting
+      if ('x1' in seg) x1=x+seg.x1;
+      if ('x2' in seg) x2=x+seg.x2;
+      if ('y1' in seg) y1=y+seg.y1;
+      if ('y2' in seg) y2=y+seg.y2;
+      if ('x'  in seg) x += seg.x;
+      if ('y'  in seg) y += seg.y;
+
+      switch(c){
+
+        case 'M': seg.letter='M'; seg.x=x; seg.y=y; break;
+        case 'L': seg.letter='L'; seg.x=x; seg.y=y; break;
+        case 'H': seg.letter='H'; seg.x=x; break;
+        case 'V': seg.letter='V'; seg.y=y; break;
+        case 'C': seg.letter='C'; seg.x1=x1; seg.y1=y1; seg.x2=x2; seg.y2=y2; seg.x=x; seg.y=y; break;
+        case 'S': seg.letter='S'; seg.x2=x2; seg.y2=y2; seg.x=x; seg.y=y; break;
+        case 'Q': seg.letter='Q'; seg.x1=x1; seg.y1=y1; seg.x=x; seg.y=y; break;
+        case 'T': seg.letter='T'; seg.x=x; seg.y=y; break;
+        case 'A': seg.letter='A'; seg.x=x; seg.y=y; break; // Don't need to change flags or nuthin
+       
+        case 'Z': case 'Z': x=x0; y=y0; break;
+      }
+    }
+    if (c=='M' || c=='m') x0=x, y0=y;
+  }
+  // console.log("abs out",segs);
+  var out= makedtext(segs);
+  // console.log("abs text",out);
+  // path.setAttribute("d",makedtext(segs));
+  el.setAttribute("d",out);
+  return segs;
+}
+
 function makerelative(el){
 	// TODO: Use path.pathSegList[], probably more difficult to break. And they broke it!
 	// console.log(el);
-	var d = el.pathSegList;
+	var d = extractpath(el.getAttribute("d"));
+	var segs = interpretpath(d);
+	// console.log("seg list", segs);
+	// var d = el.pathSegList;
 	// Makes a path relative
 	//TODO: Probably destroys arcs, and is not otherwise complete anyway
 	var ltrs = "MCLHVZSQTA";
 	// var d = extractpath(d);
 	// var p0 = new Point(d.getItem(0).x,d.getItem(0).y);
 	// console.log(x,y);
-	var firstp = d.getItem(0);
+	// var firstp = d.getItem(0);
+	var firstp = segs[0];
 	var prevseg = new Point(firstp.x, firstp.y);
-	for (var i=1; i < d.numberOfItems; i++){
+	// for (var i=1; i < d.numberOfItems; i++){
+	for (var i=1; i < segs.length; i++){
 		
-		var seg = d.getItem(i);
+		// var seg = d.getItem(i);
+		var seg = segs[i];
 		var thisp = new Point(seg.x, seg.y);
 		
-		if (ltrs.indexOf(seg.pathSegTypeAsLetter) >= 0){
+		if (ltrs.indexOf(seg.letter) >= 0){
 			
 			// var relp = new Point(seg.x-prevseg.x, seg.y-prevseg.y);
 			var relp = new Point(thisp.x-prevseg.x, thisp.y-prevseg.y);
 
 			
-			if (seg.pathSegTypeAsLetter == "A"){
+			if (seg.letter == "A"){
 				//undefined, some numbers are booleans
-				console.log("Found an arc in path and can't figure out how to make it relative.");
-			} else if (seg.pathSegTypeAsLetter == "C"){
-				// Make new relative segment and replecItem it into the seglist
-				// var newSegment  =el.createSVGPathSegArcAbs(100,200,10,10,Math.PI/2,true,false)
-				// el.createSVGPathSegLinetoRel(0,0)
-				// el.createSVGPathSegArcRel
-				var cp1 = new Point(seg.x1-prevseg.x, seg.y1-prevseg.y);
-				var cp2 = new Point(seg.x2-prevseg.x, seg.y2-prevseg.y);
+				console.log("Found an arc in path and don't know how to make it relative.");
+			} else if (seg.letter == "C"){
+
+				seg.letter = "c";
+				seg.x = relp.x;
+				seg.y = relp.y;
+				seg.x1 = seg.x1-prevseg.x;
+				seg.x2 = seg.x2-prevseg.x;
+				seg.y1 = seg.y1-prevseg.y;
+				seg.y2 = seg.y2-prevseg.y;
 				
-				d.replaceItem(el.createSVGPathSegCurvetoCubicRel(relp.x, relp.y, cp1.x, cp1.y, cp2.x, cp2.y), i);
-			} else if (seg.pathSegTypeAsLetter == "L"){
-				d.replaceItem(el.createSVGPathSegLinetoRel(relp.x, relp.y), i);
+
+				// d.replaceItem(el.createSVGPathSegCurvetoCubicRel(relp.x, relp.y, cp1.x, cp1.y, cp2.x, cp2.y), i);
+			} else if (seg.letter == "L"){
+				// d.replaceItem(el.createSVGPathSegLinetoRel(relp.x, relp.y), i);
+				seg.letter = "l";
+				seg.x = relp.x;
+				seg.y = relp.y;
 			}
-			prevseg = new Point(seg.x, seg.y); // For next segment
+			prevseg = new Point(thisp.x, thisp.y); // For next segment
 		} else {
 			// already relative segment so... probably increment running?
-			console.log("Encountered relative path segment when converting to a relative path. This is not yet supported. Your path might look a bit funny now.");
+			console.error("Encountered relative path segment when converting to a relative path. This is not yet supported. Your path might look a bit funny now. ",seg);
 		}
 		
 	}
 	// creel_empty(tagname,id,cla,attrs,NS);
-	return d;
+	// return d;
+	// console.log("output segs",segs);
+	var out= makedtext(segs);
+	
+	el.setAttribute("d",out);
+	// saveseglist(path, segs)
+	return el;
 }
 /* function positionpath(pathd, tocoords){
 	// Change path d so that the M command points to tocoords
@@ -929,10 +1559,15 @@ function makerelative(el){
 function movepath(path, point){
 	// Change path starting coordinates
 	//
-	// console.log("movepath", path, point);
-	var p = path.pathSegList.getItem(0);
-	p.x = point.x;
-	p.y = point.y;
+	// console.log("movepath", path.getAttribute("d"), point);
+	// console.log(path.getAttribute("d"));
+	// var p = path.pathSegList.getItem(0);
+	// p.x = point.x;
+	// p.y = point.y;
+	var d = extractpath(path.getAttribute("d"));
+	d[0].numbers[0] = point.x;
+	d[0].numbers[1] = point.y;
+	path.setAttribute("d", makedtext(d));
 	
 }
 
@@ -940,26 +1575,42 @@ function movepath(path, point){
 function scalepath(pa, s){
 	// Scale path by applying scale to all points of the path
 	// Ignore first point
-	var seglist = pa.pathSegList;
+	var seglist = extractpath(pa.getAttribute("d"));
 	// console.log(seglist);
-	for (var i=1; i < seglist.numberOfItems; i++){
-		var seg = seglist.getItem(i);
+	for (var i=1; i < seglist.length; i++){
+		var seg = seglist[i];
 		var p = new Point(seg.x*s, seg.y*s);
-
-		if (seg.pathSegTypeAsLetter == "a"){
-			//undefined, some numbers are booleans
-			console.log("Found an arc in the path and can't bother.");
-		} else if (seg.pathSegTypeAsLetter == "c"){
-
-			var cp1 = new Point(seg.x1*s, seg.y1*s);
-			var cp2 = new Point(seg.x2*s, seg.y2*s);
-			
-			seglist.replaceItem(pa.createSVGPathSegCurvetoCubicRel(p.x, p.y, cp1.x, cp1.y, cp2.x, cp2.y), i);
-		} else if (seg.pathSegTypeAsLetter == "l"){
-			seglist.replaceItem(pa.createSVGPathSegLinetoRel(p.x, p.y), i);
+		if (seg.numbers.length>1){
+			for (var j=0; j < seg.numbers.length; j++){
+				seg.numbers[j] = seg.numbers[j]*s
+			}
 		}
 	}
+	pa.setAttribute("d", makedtext(seglist));
 }
+function scalepath_xy(pa, xs, ys){
+	// Scale path by applying scale to all points of the path
+	// Ignore first point
+	// TODO: Doesn't work with arcs probably
+	var seglist = extractpath(pa.getAttribute("d"));
+	// console.log(seglist);
+	for (var i=1; i < seglist.length; i++){
+		var seg = seglist[i];
+		// var p = new Point(seg.x*xs, seg.y*ys);
+		if (seg.numbers.length>1){
+			for (var j=0; j < seg.numbers.length; j++){
+				if (j%2==0){
+					seg.numbers[j] = seg.numbers[j] * xs;
+				} else {
+					seg.numbers[j] = seg.numbers[j] * ys;
+				}
+				
+			}
+		}
+	}
+	pa.setAttribute("d", makedtext(seglist));
+}
+
 function positionpath_transform(el,point){
 	// Position group element using transform
 	// Get path start point
@@ -979,7 +1630,7 @@ function copyelement(group, el, point, style){
 	// console.log("after clone in copyelement",cln);
 	// position path by replacing its M command
 	// cln.setAttribute("d",positionpath(cln.getAttribute("d"), coords));
-	
+	addel(group, cln);
 	// console.log("before movepath in copyelement",cln);
 	movepath(cln, point);
 	// console.log("after movepath in copyelement",cln);
@@ -990,7 +1641,7 @@ function copyelement(group, el, point, style){
 	
 	// put in svg in group
 	// console.log("before addel in copyelement",cln);
-	addel(group, cln);
+	
 	// console.log("after addel in copyelement",cln);
 	return cln;
 	
@@ -1029,40 +1680,43 @@ function move(el,point) {
 }
 function mirrorpath(group, path, vertical){
 	// Mirror path d coordinates, maintain first point, return new path
+
 	// Clone new element from path
 	var cln = path.cloneNode(true);
-	// if (style){
-		// cln.setAttribute("style",style);
-	// }
-	p1 = cln;
+
 	var ltrs = "CLHVZSQTA"; // Absolute coordinate commands
-	var seglist = cln.pathSegList;
-	for (var i=1; i<seglist.numberOfItems;i++ ){
-		var seg = seglist.getItem(i);
-		if (ltrs.indexOf(seg.pathSegTypeAsLetter) >=0){
+	var seglist = extractpath(cln.getAttribute("d"));
+	
+	for (var i=1; i<seglist.length;i++ ){
+		var seg = seglist[i];
+		if (ltrs.indexOf(seg.letter) >=0){
 			console.log("mirrorpath(): Path contains absolute segment:",path);
 		}
 		if (vertical){
 			// Mirror vertically
-			console.log("mirrorpath(): Vertical mirror not implemented yet:",path);
+			// console.log("mirrorpath(): Vertical mirror not implemented yet:",path);
+			seg.numbers[1] = -seg.numbers[1];
+			if (seg.numbers[3]) seg.numbers[3] = -seg.numbers[3];
+			if (seg.numbers[5]) seg.numbers[5] = -seg.numbers[5];
 		} else {
-			if (seg.pathSegTypeAsLetter == "a"){
+			if (seg.letter == "a"){
 				// Mirroring an arc segment
-				// console.log("mirrorpath(): Arc segment:",seg);
+				console.log("mirrorpath(): Arc segment, arcs not implemented:",seg);
 				// console.log(seg.sweepFlag);
-				seg.sweepFlag = false;
+				// seg.sweepFlag = false;
 				// console.log(seg.sweepFlag);
 			}
 			// Mirror horizontally
-			seg.x = -seg.x;
-			if (seg.x1) seg.x1 = -seg.x1;
-			if (seg.x2) seg.x2 = -seg.x2;
+			seg.numbers[0] = -seg.numbers[0];
+			if (seg.numbers[2]) seg.numbers[2] = -seg.numbers[2];
+			if (seg.numbers[4]) seg.numbers[4] = -seg.numbers[4];
 			
 		}
 	}
 	// put in svg in group
 	cln.id += "-mirrored";
 	addel(group, cln);
+	cln.setAttribute("d", makedtext(seglist));
 	return cln;
 }
 
@@ -1127,44 +1781,51 @@ function path_calculate_cursor_pos(path){
 	return output;
 }
 function greaterof(a,b){if (a>=b){return a;} else {return b;}}
-	function smallerof(a,b){if (a<=b){return a;} else {return b;}}
-	function isbetween(a,b,c){
-		var greater = greaterof(a,c);
-		var smaller = smallerof(a,c);
-		return (b >= smaller && b <= greater);
-	}
+function smallerof(a,b){if (a<=b){return a;} else {return b;}}
+function isbetween(a,b,c){
+	// var greater = greaterof(a,c);
+	// var smaller = smallerof(a,c);
+	// return (b >= smaller && b <= greater);
+	if (a <= b && b <= c) return true;
+	if (c <= b && b <= a) return true;
+	// if (a == b && b== c) return true;
+	return false;
+}
 function intersectline(p1,p2,     p3,p4,	dontcheckbounds) {
-	
 	// p1 and p2 are the start end end points of one line, likewise for p3 and p4
 	// Return intersect coordinates of two lines
-	// y = mx+b
+	// TODO: If one line is straight, returns value only if doncheckbounds is used
 	var m1 = (p2.y-p1.y) / (p2.x-p1.x);
 	var m2 = (p4.y-p3.y) / (p4.x-p3.x);
-	// p1.y = m1*p1.x +b1
-	// b1 = p1.y-m1*p1.x 
-	var b1 = p1.y-m1*p1.x;
-	var b2 = p3.y-m2*p3.x;
-	// y = m1*x+b1
-	// m1*x+b1 = m2*x+b2
-	// m1*x + b1 - b2 = m2*x
-	// m2*x - m1*x = b1 - b2
-	// (m2-m1)*x = b1 - b2
-	var x = (b1 - b2) / (m2-m1);
-	if (isNaN(x)) { // if x,y = NaN, one line was vertical, m&b will also be NaN
-		if (p1.x==p2.x) {
-			x=p1.x;
-			var y = m2*x + b2;
-		}
-		else if (p3.x==p4.x) {
-			x=p3.x;
-			var y = m1*x + b1;
-		}
-	} else {
-		var y = m1*x + b1;
+
+	// var b1 = p1.y-m1*p1.x;
+	// var b2 = p3.y-m2*p3.x;
+
+	var y,x;
+	if (p1.y == p2.y && p3.x == p4.x){ // l1 is horizontal, l2 is vertical
+		y = p1.y;
+		x = p3.x;
+		if (!dontcheckbounds && isbetween(p1.x,x,p2.x) && isbetween(p3.y,y,p4.y)) return new Point(x,y);
+	} else if (p1.x == p2.x && p3.y == p4.y){ // l1 vertical, l2 horizontal
+		y = p3.y;
+		x = p1.x;
+		if (!dontcheckbounds && isbetween(p3.x,x,p4.x) && isbetween(p1.y,y,p2.y)) return new Point(x,y);
+	} else if (m1 == m2){ // parallel lines never meet, or intersect evrywhere, in which case, why are you bothering this function?
+		return false;
+	} else if (!isFinite(m1)){ // line 1 is vertical
+		x = p1.x;
+		y = m2*(p1.x - p3.x) + p3.y;
+	} else if (!isFinite(m2)){ // line 2 is vertical
+		// TODO: still does not work?
+		x = p3.x;
+		y = m1*(p3.x - p1.x) + p1.y;
+	} else { // Normal case
+		x = (p1.x*m1 - m2*p3.x - p1.y + p3.y)/(m1-m2);
+		y = (x - p1.x)*m1 + p1.y;
+		
 	}
 	
-	// TODO: if one is horizontal, sometimes this still fails. Maybe add 0.000000000001 to one y coordinate?
-	// TODO: What if lines are colinear?
+
 	if (dontcheckbounds){
 		return new Point(x,y);
 	}
@@ -1203,11 +1864,19 @@ function intersectBBox(r1, r2) {
 		return false;
 	}
 }
-function convertToAbsolute(path){
+function convertToAbsolute(path, fromzero){
+	var fromzero = fromzero || false; 
 	// https://embed.plnkr.co/a4GIp0/
-  var x0,y0,x1,y1,x2,y2,segs = path.pathSegList;
-  for (var x=0,y=0,i=0,len=segs.numberOfItems;i<len;++i){
-    var seg = segs.getItem(i), c=seg.pathSegTypeAsLetter;
+	var segs = interpretpath(extractpath(path.getAttribute("d")));
+	if (fromzero){ // Start from zero
+		// console.log("starting from zero");
+		segs[0].x =0;
+		segs[0].y =0;
+	}
+	// console.log("abs in",path.getAttribute("d"));
+  var x0,y0,x1,y1,x2,y2;
+  for (var x=0,y=0,i=0; i<segs.length; ++i){
+    var seg = segs[i], c=seg.letter;
     if (/[MLHVCSQTA]/.test(c)){
       if ('x' in seg) x=seg.x;
       if ('y' in seg) y=seg.y;
@@ -1218,22 +1887,31 @@ function convertToAbsolute(path){
       if ('y2' in seg) y2=y+seg.y2;
       if ('x'  in seg) x += seg.x;
       if ('y'  in seg) y += seg.y;
-
+	// TODO: This might not quite work? Even if it does, it would be preferrable to not use pathseglist or the path API just in case
+		// seg.x=x; seg.y=y; // Always the same, except h,v....
       switch(c){
-        case 'm': segs.replaceItem(path.createSVGPathSegMovetoAbs(x,y),i);                   break;
-        case 'l': segs.replaceItem(path.createSVGPathSegLinetoAbs(x,y),i);                   break;
-        case 'h': segs.replaceItem(path.createSVGPathSegLinetoHorizontalAbs(x),i);           break;
-        case 'v': segs.replaceItem(path.createSVGPathSegLinetoVerticalAbs(y),i);             break;
-        case 'c': segs.replaceItem(path.createSVGPathSegCurvetoCubicAbs(x,y,x1,y1,x2,y2),i); break;
-        case 's': segs.replaceItem(path.createSVGPathSegCurvetoCubicSmoothAbs(x,y,x2,y2),i); break;
-        case 'q': segs.replaceItem(path.createSVGPathSegCurvetoQuadraticAbs(x,y,x1,y1),i);   break;
-        case 't': segs.replaceItem(path.createSVGPathSegCurvetoQuadraticSmoothAbs(x,y),i);   break;
-        case 'a': segs.replaceItem(path.createSVGPathSegArcAbs(x,y,seg.r1,seg.r2,seg.angle,seg.largeArcFlag,seg.sweepFlag),i);   break;
+        // case 'm': segs.replaceItem(path.createSVGPathSegMovetoAbs(x,y),i);                   break;
+        case 'm': seg.letter='M'; seg.x=x; seg.y=y; break;
+        case 'l': seg.letter='L'; seg.x=x; seg.y=y; break;
+        case 'h': seg.letter='H'; seg.x=x; break;
+        case 'v': seg.letter='V'; seg.y=y; break;
+        case 'c': seg.letter='C'; seg.x1=x1; seg.y1=y1; seg.x2=x2; seg.y2=y2; seg.x=x; seg.y=y; break;
+        case 's': seg.letter='S'; seg.x2=x2; seg.y2=y2; seg.x=x; seg.y=y; break;
+        case 'q': seg.letter='Q'; seg.x1=x1; seg.y1=y1; seg.x=x; seg.y=y; break;
+        case 't': seg.letter='T'; seg.x=x; seg.y=y; break;
+        case 'a': seg.letter='A'; seg.x=x; seg.y=y; break; // Don't need to change flags or nuthin
+       
         case 'z': case 'Z': x=x0; y=y0; break;
       }
     }
     if (c=='M' || c=='m') x0=x, y0=y;
   }
+  // console.log("abs out",segs);
+  var out= makedtext(segs);
+  // console.log("abs text",out);
+  // path.setAttribute("d",makedtext(segs));
+  path.setAttribute("d",out);
+  return segs;
 }
 
 function planey3dline (p1,p2, yval){
@@ -1251,38 +1929,25 @@ function planey3dline (p1,p2, yval){
 }
 
 
+
 ////////////////////////////////////////////////////////////////////////////////
 // Fast path intersections using some higher level math
 function pathline_intersect (path,line,debug){
-	// Intersect any svg path and a line segment, where line is an array of Point objects, whose coordinates are absolute
+	// Intersect any svg path and a line segment, where line is an array of two Point objects, whose coordinates are absolute
 	// Loops through the whole path but stops when the first intersection is found, returns false if nothing was found
-	// Will probably find intersections for M,m path commands too
-	
-	var seglist = path.pathSegList;
-	// console.log("pathline_intersect", seglist);
-	// if (path.pathSegList._list === undefined){
-		// console.log("pathline_intersect", path.pathSegList);
-		
-	// } else if (path.pathSegList._list !== undefined){
-		// console.log("pathline_intersect._list", path.pathSegList);
-		// var seglist = path.pathSegList._list;
-	// } else if (path.pathSegList._list._list !== undefined){
-		// console.log("pathline_intersect._list._list", path.pathSegList._list._list);
-		// var seglist = path.pathSegList._list._list;
-	// }
-	
+	var seglist = interpretpath(extractpath(path.getAttribute("d")));
 	
 	var lx = [line[0].x,line[1].x];
 	var ly = [line[0].y,line[1].y];
 	var LTRS = "MCLHVZSQTA";
-	var sge = seglist.getItem(0);
+	var sge = seglist[0];
 	var segend = new Point(sge.x, sge.y);
 	// console.log("pathline list length", seglist.numberOfItems);
 	
-	for (var i=1; i<seglist.numberOfItems;i++){
+	for (var i=1; i<seglist.length;i++){
 		// Get absolute coordinates for path segment control points
-		var seg = seglist.getItem(i);
-		if (LTRS.indexOf(seg.pathSegTypeAsLetter) > 0){
+		var seg = seglist[i];
+		if (LTRS.indexOf(seg.letter) > 0){
 			// Path segment is absolute already
 			if (debug) console.log("absolute segment",i);
 			var px = [segend.x, // last segend = start of this one
@@ -1310,15 +1975,17 @@ function pathline_intersect (path,line,debug){
 		// Try to intersect path segment with line
 		if (debug) console.log("pathline",px,py,lx,ly);
 		
-		if (seg.pathSegTypeAsLetter == "a" || seg.pathSegTypeAsLetter == "A"){
+		if (seg.letter == "a" || seg.letter == "A"){
 			if (debug) console.log("pathline A");
+			// TODO: This can't work:
 			var inter = arc_intersect(px,py,lx,ly, seg);
-		} else if (seg.pathSegTypeAsLetter == "l" || seg.pathSegTypeAsLetter == "L"){
+		} else if (seg.letter == "l" || seg.letter == "L"){
 			var inter = intersectline(new Point(px[0],py[0]),new Point(px[3],py[3]),     line[0],line[1]);
 			
 		} else { // Bezier segment
 			var inter = computeIntersections(px,py,lx,ly, true);
 			if (inter.x==0 && inter.y ==0){inter = false;}
+			// TODO: Does this ==0 check make any sense?
 		}
 		
 		if (inter){
@@ -1486,7 +2153,7 @@ function arc_intersect(px,py,lx,ly, arcseg){
 		// Rotate selected intersection point to original coordinates
 		
 	}
-	console.log("No valid intersections");
+	console.log("arc_intersect: No valid intersections");
 	return false;
 }
 
@@ -1707,8 +2374,7 @@ function computeIntersections(px,py,lx,ly,verify){
 }
 
 /*based on http://mysite.verizon.net/res148h4j/javascript/script_exact_cubic.html#the%20source%20code*/
-function cubicRoots(P)
-{
+function cubicRoots(P){
 	var a=P[0];
 	var b=P[1];
 	var c=P[2];
@@ -1765,8 +2431,7 @@ function cubicRoots(P)
     return t;
 }
 
-function sortSpecial(a)
-{
+function sortSpecial(a){
     var flip;
     var temp;
     
@@ -1789,14 +2454,12 @@ function sortSpecial(a)
 }
 
 // sign of number
-function sgn( x )
-{
+function sgn( x ){
     if (x < 0.0) return -1;
     return 1;
 }
 
-function bezierCoeffs(P0,P1,P2,P3)
-{
+function bezierCoeffs(P0,P1,P2,P3){
 	var Z = Array();
 	Z[0] = -P0 + 3*P1 + -3*P2 + P3; 
     Z[1] = 3*P0 - 6*P1 + 3*P2;
@@ -1804,6 +2467,7 @@ function bezierCoeffs(P0,P1,P2,P3)
     Z[3] = P0;
 	return Z;
 }
+
 //////////////////////////////////////////////////////////////////////////////
 // Array functionality
 
@@ -1842,9 +2506,25 @@ function findmin(array){ // find smallest number in an array, return index
   }
   return maxcounter;
 }
+function copyobj(obj){ // Clone an object, first level only
+	var copy = {};
+	for (var attr in obj) {
+        if (obj.hasOwnProperty(attr)) copy[attr] = obj[attr];
+    }
+    return copy;
+}
+function objdif(o1,o2){ // Return list of properties that have been changed
+	var out={};
+	for (var attr in o1) {
+        if ((o1.hasOwnProperty(attr) && o2.hasOwnProperty(attr)) && o1[attr] != o2[attr]) {
+			out[attr] = o1[attr];
+		}
+    }
+	return out;
+}
 
 //////////////////////////////////////////////////////////////////////////////
-// SVG styling helpers
+// SVG styling helpers and text functions
 
 function makestyle(style, repls){
 	// TODO: This is not ready obviously
@@ -1858,12 +2538,26 @@ function makestyle(style, repls){
 	return out;
 }
 
+function ordinal(num){
+	if (num==1){
+		return num+"st";
+	} else if (num==2){
+		return num+"nd";
+	} else if (num==3){
+		return num+"rd";
+	} else {
+		return num+"th";
+	}
+}
 
 
 
 
-
-
+function for_each(from,to,array,input_function){
+	for (var i=from; i<to; i++){
+		input_function (array[i]);
+	}
+}
 
 
 

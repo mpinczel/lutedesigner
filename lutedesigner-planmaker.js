@@ -21,9 +21,9 @@
 // Make option for forms available if this file is included
 features_init.push(function(){
 	var dp = getelid("drawingpurpose");
-	var fo = creel("option","","",["value","technicalformplanmaker"]);
-	fo.innerHTML = "Form drawing Full Plan";
-	addel(dp, fo);
+	// var fo = creel("option","","",["value","technicalformplanmaker"]);
+	// fo.innerHTML = "Form drawing Full Plan";
+	// addel(dp, fo);
 	// var co = creel("option","","",["value","technicalcarvedformplanmaker"]);
 	// co.innerHTML = "Carved form drawing Full Plan";
 	// addel(dp, co);
@@ -32,7 +32,7 @@ features_init.push(function(){
 	// Add page title box for easier tab bar navigation in browser
 	var bvb = getelid("instrumentpreset").parentNode;
 	var label = creel("label");
-	var fo = creel("input","pagetitle","",["type","text","onchange","settingchange(this)"]);
+	var fo = creel("input","pagetitle","",["type","text","onchange","settingchange(this)","title","This will be used as the window title so you can find this tab easily in your browser."]);
 	label.innerHTML = "Project Title: ";
 	addelafter(bvb, label);
 	addel(label, fo);
@@ -48,7 +48,8 @@ features_init.push(function(){
 });
 
 features.push(function planmaker(){
-	if (editorstate.drawingpurpose == "technicalformplanmaker"){
+	try {
+	if (editorstate.drawingpurpose == "technical"){
 	var frontview = getelid("frontview");
 	var sideview = getelid("sideview");
 	
@@ -83,11 +84,13 @@ features.push(function planmaker(){
 						[-70,435,"1.8"],
 						[-15,460,"2.0"]];
 		
+	} else if (editorstate.bodyshapefrom=="guitar"){
+		// Nothing if guitar
 	} else {
 		var btm = insert_drawing("", "thicknesses-renaissance", frontview, FRONTVIEWORIGIN.move(0,-10));
 		var wscale = (2*cps.width) / 310;
 		var hscale = (cps.height-40) / 450;
-		console.log(wscale, hscale);
+		// console.log(wscale, hscale);
 		btm.setAttribute("transform",btm.getAttribute("transform")+" scale("+wscale+" "+hscale+")"); 
 		var points = [	[20, 50, "1.9"], // x,y,val
 						[-20, 270, "1.3"],
@@ -96,12 +99,14 @@ features.push(function planmaker(){
 						[-70,380,"1.7"],
 						[-15,430,"1.9"]];
 	}
-	points.forEach(function(item, index, array){
-		var group = makegroup(frontview,"thicknessball_"+index);
-		var p = FRONTVIEWORIGIN.move(item[0]*wscale,-item[1]*hscale);
-		drawellipse(group, p,10,7,COVERSTYLE);
-		drawtext(group, p.move(-6.5,3.5), item[2]);
-	});
+	if (points){
+		points.forEach(function(item, index, array){
+			var group = makegroup(frontview,"thicknessball_"+index);
+			var p = FRONTVIEWORIGIN.move(item[0]*wscale,-item[1]*hscale);
+			drawellipse(group, p,10,7,COVERSTYLE);
+			drawtext(group, p.move(-6.5,3.5), item[2]);
+		});
+	}
 	// Draw thickness balls around the soundboard
 	
 	// inner endclasp thingy - use inner body shape and then something
@@ -109,45 +114,58 @@ features.push(function planmaker(){
 	// var line = [FRONTVIEWORIGIN.move(-10000, -barlist[9].pos), FRONTVIEWORIGIN.move(10000, -barlist[9].pos)];
 	// drawline(frontview, line);
 	// var intr = pathline_intersect (inside_side,line);
-	// TODO: intersect inside_side every mm in y until y==barlist[9].pos to obtain points for shape of inside liner piece
-	var ys = [0,-0.1,-0.2,-0.3,-0.4,-0.5,-0.8];
-	var y = 1;
-	while (y < barlist[9].pos){
-		ys.push(-y);
-		y++;
-	}
-	var inttr = getpoints(inside_side, ys,false)
-	var iX = inttr.X;
-	var iY = inttr.Y;
-	var shape = [];
-	var shape2 = [];
-	var rshape = [];
-	var rshape2 = [];
-	for (var i=0; i< iY.length; i++){
-		shape.push(FRONTVIEWORIGIN.move(iX[i], -2.5+iY[i]));
-		shape2.push(FRONTVIEWORIGIN.move(iX[i]-2.3, -8+iY[i]));
-		rshape.push(FRONTVIEWORIGIN.move(-iX[i], -2.5+iY[i]));
-		rshape2.push(FRONTVIEWORIGIN.move(-iX[i]+2.3, -8+iY[i]));
-	}
-	shape2.reverse();
-	rshape2.reverse();
-	var shape3 = [];
-	var rshape3 = [];
-	for (var i=0; i< shape2.length; i++){
-		if (rshape2[i].y > FRONTVIEWORIGIN.y-barlist[9].pos){
-			shape3.push(shape2[i]);
-			rshape3.push(rshape2[i]);
+	// Create inside liner piece on frontview
+	if (lute3d.inribpaths){
+	
+		var inshape = lute3d.inribpaths.soundboard_edge;
+		var i = 1;
+		var shape = [];
+		var shape2 = [];
+		var rshape = [];
+		var rshape2 = [];
+		var seg = new Point(0,0);
+		
+		while (seg.y <= barlist[9].pos){
+			if ("mlachvsqt".indexOf(inshape[i].letter) > 0){
+				seg = new Point(seg.x+inshape[i].x, seg.y+inshape[i].y)
+			} else {
+				seg = new Point(inshape[i].x, inshape[i].y)
+			}
+			
+			shape.push(FRONTVIEWORIGIN.addpoint(seg.scale(-1,-1)).move(0, -2.5) );
+			rshape.push(FRONTVIEWORIGIN.addpoint(seg.scale(1,-1)).move(0, -2.5) );
+			
+			// If inside shape of liner is below end of outside shape
+			if (seg.y+8 <= barlist[9].pos){
+				shape2.push(FRONTVIEWORIGIN.addpoint(seg.scale(-1,-1)).move(-2.3, -8));
+				rshape2.push(FRONTVIEWORIGIN.addpoint(seg.scale(1,-1)).move(2.3, -8));
+			}
+			// shape.push(inshape[i].scale(1,-1));
+			i++;
 		}
-	}
-	shape.push(getlast(shape).move(2));
-	rshape.push(getlast(rshape).move(-2));
-	// shape.push(FRONTVIEWORIGIN.move(0, -7.5));
-	shape = shape.concat(shape3);
-	rshape = rshape.concat(rshape3);
+		
+		
+		shape2.reverse();
+		rshape2.reverse();
+		var shape3 = [];
+		var rshape3 = [];
+		for (var i=0; i< shape2.length; i++){
+			if (rshape2[i].y > FRONTVIEWORIGIN.y-barlist[9].pos){
+				shape3.push(shape2[i]);
+				rshape3.push(rshape2[i]);
+			}
+		}
+		shape.push(getlast(shape).move(2));
+		rshape.push(getlast(rshape).move(-2));
+		// shape.push(FRONTVIEWORIGIN.move(0, -7.5));
+		shape = shape.concat(shape3);
+		rshape = rshape.concat(rshape3);
 
-	rshape.reverse();
-	shape = shape.concat(rshape);
-	drawshape(frontview, shape, BEHINDSTYLE, "inside-liner", true);
+		rshape.reverse();
+		shape = shape.concat(rshape);
+		var liner = drawshape(frontview, shape, BEHINDSTYLE, "inside-liner", true);
+	}
+	// console.log(liner);
 	// var i=0;
 	// var ps = inside_side.pathSegList;
 	// console.log(ps);
@@ -185,6 +203,8 @@ features.push(function planmaker(){
 			bardistances.push(-(barlist[4].pos-minibars[i].y));
 		}
 		
+	} else if (editorstate.bodyshapefrom=="guitar"){
+		// nothing
 	} else {
 		minibars = [new Point(w,w*0.8),
 					new Point(w+10,w*0.3),
@@ -198,7 +218,7 @@ features.push(function planmaker(){
 			bardistances.push(-(barlist[4].pos-minibars[i].y));
 		}
 	}
-	
+	if (editorstate.bodyshapefrom!="guitar"){
 	// Soundboard bar front view explanation
 	insert_drawing("", "bar-side", frontview, FRONTVIEWORIGIN.move(cps.width-2.5, -barlist[2].pos));
 	insert_drawing("", "bar-small", frontview, FRONTVIEWORIGIN.move(cps.width));
@@ -232,7 +252,7 @@ features.push(function planmaker(){
 		insert_drawing("", "endpin-theorbo", frontview, FRONTVIEWORIGIN);
 		insert_drawing("", "endpin-theorbo-side", getelid("sideview"), SIDEVIEWORIGIN.move(-22));
 		// TODO: intersect sideview path with vertical line to find correct y-position for endpin, maybe even angle with a perpendicular of the segment
-		insert_drawing("", "endpin-theorbo", getelid("sideview"), cps.neckstrap, cps.neckstrapangle);
+		// insert_drawing("", "endpin-theorbo", getelid("sideview"), cps.neckstrap, cps.neckstrapangle);
 		insert_drawing("", "endpin-theorbo-top", getelid("crosslayer"), CROSSVIEWORIGIN);
 		// Screw in extension/neck
 		insert_drawing("", "extension-screw", sideview, new Point(SIDEVIEWORIGIN.x, cps.nutmid.y).move(-8,-3));
@@ -245,7 +265,7 @@ features.push(function planmaker(){
 		insert_drawing("", "pegbox-screw", sideview, new Point(SIDEVIEWORIGIN.x, cps.nutmid.y).move(-14,8));
 	}
 	insert_drawing("", "neckblock-screws", sideview, SIDEVIEWORIGIN.move(-2.5,-cps.neckblocky));
-	
+	}
 	// Patterns, nut spacings, bridge with spacings, peg&strap pin plans - a sheet
 	// var origin
 	var sheet = new Point(-400,0);
@@ -275,15 +295,15 @@ features.push(function planmaker(){
 		addel(sheetgroup, el);
 		return el;
 	}
-	
+	/* 
 	// Copy bridge to sheet
 	addtosheet("bridge-group", "bridgetop", new Point(30,30));
 	var br = getelid("bridge-front-group")
 	br.style = "";
 	addtosheet("bridge-front-group", "bridgebody", new Point(30,10));
 	delel(br);
-	var br = insert_drawing("", "bridge-crosssection", sheetgroup, new Point(0,0));
-	addtosheet("bridge-crosssection", "bridge-cross-outline", new Point(10,60));
+	// var br = insert_drawing("", "bridge-crosssection", sheetgroup, new Point(0,0));
+	// addtosheet("bridge-crosssection", "bridge-cross-outline", new Point(10,60));
 	getelid("bridge_size_legend-copy").style = "";
 	// nut
 	var nut = addtosheet("nutgroup", "nut_outline", new Point(10,80), cps.nutangle+0.5*Math.PI);
@@ -292,7 +312,7 @@ features.push(function planmaker(){
 	// Pegs 
 	if (editorstate.fingerboardcourses == 6){
 		insert_drawing("", "pegs-renaissance", sheetgroup, sheet.move(0,100));
-		insert_drawing("", "pegs-heart", sheetgroup, sheet.move(0,100));
+		insert_drawing("", "pegs-heart", sheetgroup, sheet.move(90,100));
 	} else if (editorstate.numbernuts > 1 || editorstate.fingerboardcourses >= 9){
 		insert_drawing("", "pegs-baroque", sheetgroup, sheet.move(0,100));
 	} else {
@@ -308,12 +328,16 @@ features.push(function planmaker(){
 
 	}
 	
-	
+	 */
 	
 	// Explanation texts spaced accurately or in a place that allows them to be moved easily
 
 	
 	} // endif
+	} catch (e) {
+		console.log("Failed to finalize plan: ");
+		console.log(e);
+	}
 });
 
 // 
