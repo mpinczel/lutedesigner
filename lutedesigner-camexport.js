@@ -52,7 +52,8 @@ var CAMSETS = [
 		desc:"Ribs unfolded flat: centre rib C, the numbered ribs and the two end clasp pieces. The rib strips are cut to these.", parts:function(){
 		var out = cam_children("flatribs-layer", /^flatribg-/);
 		var ec = getelid("endclasp-flat-template-group");
-		if (ec) out.push({name:"endclasp-flat", el:ec, split:true});
+		// Drawn as two mirrored halves meeting on the centre line, the template is one piece
+		if (ec) out.push({name:"endclasp-flat", el:ec, mirrorjoin:true});
 		return out;
 	}},
 	{key:"ribsupports", group:"foamcore", label:"Rib supports",
@@ -371,6 +372,46 @@ function cam_bodyoutline(root){
 	return [{name:"body-outline", cut:[{start:h1.start, segs:segs, closed:true}], marks:[]}];
 }
 
+function cam_joinmirrored(name, geom){
+	// Join two closed halves that share a straight edge on a vertical centre line into one outline.
+	// Returns null if the geometry is not like that, so the caller can fall back to splitting.
+	if (geom.cut.length != 2) return null;
+	var b0 = cam_bbox([geom.cut[0]]), b1 = cam_bbox([geom.cut[1]]);
+	var axis = Math.abs(b0.x1-b1.x0) < 0.01 ? b0.x1 : Math.abs(b1.x1-b0.x0) < 0.01 ? b1.x1 : null;
+	if (axis === null) return null;
+	var onaxis = function(p){ return Math.abs(p[0]-axis) < 0.01; };
+	var same = function(p, q){ return Math.hypot(p[0]-q[0], p[1]-q[1]) < 0.01; };
+	var chain = function(sub){
+		// Open chain of the half's segments without its centre line edge
+		var segs = sub.segs.slice(), starts = [sub.start];
+		for (var i=0; i<segs.length-1; i++) starts.push(segs[i].p);
+		var last = segs[segs.length-1].p;
+		if (!same(last, sub.start)){ starts.push(last); segs.push({t:"L", p:sub.start}); }
+		var k = -1;
+		for (var i=0; i<segs.length; i++){
+			if (segs[i].t == "L" && onaxis(starts[i]) && onaxis(segs[i].p)){
+				if (k >= 0) return null; // more than one centre line edge
+				k = i;
+			}
+		}
+		if (k < 0) return null;
+		var out = [];
+		for (var j=1; j<segs.length; j++) out.push(segs[(k+j) % segs.length]);
+		return {start:segs[k].p, segs:out, closed:false};
+	};
+	var c0 = chain(geom.cut[0]), c1 = chain(geom.cut[1]);
+	if (!c0 || !c1) return null;
+	var end0 = c0.segs[c0.segs.length-1].p;
+	if (!same(c1.start, end0)){
+		c1 = cam_reversesub(c1);
+		if (!same(c1.start, end0)) return null;
+	}
+	if (!same(c1.segs[c1.segs.length-1].p, c0.start)) return null;
+	var segs = c0.segs.concat(c1.segs);
+	segs[segs.length-1] = Object.assign({}, segs[segs.length-1], {p:c0.start}); // close exactly
+	return [{name:name, cut:[{start:c0.start, segs:segs, closed:true}], marks:geom.marks}];
+}
+
 function cam_splitparts(name, geom){
 	// Each closed outline becomes a part, open markings go to the smallest outline containing them
 	var parts = geom.cut.map(function(sub, i){
@@ -394,7 +435,8 @@ function cam_gatherset(set, root){
 	var parts = [];
 	set.parts().forEach(function(p){
 		var geom = cam_collect(p.el, root);
-		if (p.split) parts = parts.concat(cam_splitparts(p.name, geom));
+		if (p.mirrorjoin) parts = parts.concat(cam_joinmirrored(p.name, geom) || cam_splitparts(p.name, geom));
+		else if (p.split) parts = parts.concat(cam_splitparts(p.name, geom));
 		else if (geom.cut.length) parts.push({name:p.name, cut:geom.cut, marks:geom.marks});
 	});
 	return parts;
