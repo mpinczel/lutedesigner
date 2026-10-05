@@ -58,7 +58,8 @@ var CAMSETS = [
 		return out;
 	}},
 	{key:"ribsupports", group:"foamcore", label:"Rib supports",
-		desc:"One board per rib joint line (joint 0 = centre, the last = edge), following the joint from tail to neck block. Small notches mark the supports. Drawn soundboard edge up.", parts:function(){
+		pair:function(name){ return true; }, // Joints of one half and the soundboard edge, none on the centre line
+		desc:"One board per rib joint line of one half (joint 0 = beside the centre rib, the last = soundboard edge), following the joint from tail to neck block, one per side. Small notches mark the supports. Drawn soundboard edge up.", parts:function(){
 		return cam_children("formlayer", /^ribsupportg-/);
 	}},
 	{key:"foamform", group:"foamcore", label:"Foam core supports and blocks",
@@ -789,8 +790,8 @@ function cam_partlabel(key, name){
 		if ((m = name.match(/^flatribg-(\d+)(-mirrored)?$/))) return m[1] == "1" ? "C" : String(parseInt(m[1])-1) + (m[2] ? "m" : "");
 		return name == "endclasp-flat" || name == "endclasp-flat-1" ? "end clasp" : "";
 	}
+	if (key != "flatribs" && /-mirrored$/.test(name)) return cam_partlabel(key, name.replace(/-mirrored$/, "")) + " m";
 	if (key == "ribsupports") return "joint " + name.replace("ribsupportg-", "");
-	if (/-mirrored$/.test(name)) return cam_partlabel(key, name.replace(/-mirrored$/, "")) + " m";
 	return name.replace(/^(supportg-|cross-support-|carved-form-|formblock-|simple-form2?-|simple2?-|cross2-support-)/, "").replace(/-group$/, "");
 }
 
@@ -874,7 +875,7 @@ function cam_opendialog(){
 		html += '<hr><label style="display:block">Files <select id="cam-files">'+
 				'<option value="group" selected>One per group</option><option value="set">One per part set</option><option value="one">All parts in one file</option></select></label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-guide" checked> Include parts guide (HTML)</label>'+
-			'<label style="display:block" title="Rib templates and carved mould cross supports cover half the bowl. Adds a mirrored copy of each (all ribs except the centre rib), labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Mirrored pairs: ribs 1 and up, carved cross supports</label>'+
+			'<label style="display:block" title="Rib templates, rib supports and carved mould cross supports cover half the bowl. Adds a mirrored copy of each (all ribs except the centre rib), labelled m in the guide."><input type="checkbox" id="cam-ribpairs" checked> Mirrored pairs: ribs 1 and up, rib supports, carved cross supports</label>'+
 			'<label style="display:block"><input type="checkbox" id="cam-marks" checked> Include markings (blue open lines)</label>'+
 			'<label style="display:block">Max layout width <input type="number" id="cam-sheetwidth" value="1200" min="100" step="10" style="width:6em"> mm</label>'+
 			'<label style="display:block">Gap between parts <input type="number" id="cam-gap" value="10" min="0" step="1" style="width:6em"> mm</label>'+
