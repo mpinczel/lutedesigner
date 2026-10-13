@@ -1,6 +1,7 @@
 /*
 	<Lutedesigner - A parametric design aid for lutes>
     Copyright (C) 2019  Lauri Niskanen
+    Modified 2026 by Mate Pinczel: rib joint trimming at the end clasp. See README.md.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -1,4 +1,5 @@
 // Lute Designer by Larui Niskanen 2021
+// Modified 2026 by Mate Pinczel: interface translation of drawing labels. Licensed GPLv3, see LICENSE and README.md.
 // New instrument object based drawing system
 /*
 settingchange() collects data from the page to editorstate 

@@ -1,6 +1,7 @@
 /*
 	<Lutedesigner - A parametric design aid for lutes>
     Copyright (C) 2019  Lauri Niskanen
+    Copyright (C) 2026  Mate Pinczel (interface languages, this file)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,6 +52,8 @@ var I18N_HU = {
 	"Mobilon húzással mozgathat, két ujjal nagyíthat. A visszavonás, az újra és a mérés a fenti gombokkal érhető el.",
 "To share a drawing with somebody else, or save it for later, simply copy the whole URL from the address bar.":
 	"Ha meg akarja osztani a rajzot, vagy később folytatná, egyszerűen másolja ki a teljes webcímet a címsorból.",
+"This is a modified version of Lute Designer by Lauri Niskanen, with CAM export and a Hungarian interface added by Mate Pinczel. It is not an official release; the original is at niskanenlutes.com.":
+	"Ez a Lute Designer (Lauri Niskanen) módosított változata, CAM exporttal és magyar felülettel, amelyeket Mate Pinczel készített. Nem hivatalos kiadás; az eredeti a niskanenlutes.com oldalon érhető el.",
 "Lute Designer is": "A Lute Designer",
 "free open source software": "szabad, nyílt forráskódú szoftver,",
 "licensed under": "licence:",

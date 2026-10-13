@@ -1,4 +1,6 @@
-"""Build a portable Lute Designer: a folder (and zip) that runs by opening index.html, no server or install needed.
+"""Part of Lute Designer, licensed GPLv3 (see LICENSE). Copyright (C) 2026 Mate Pinczel.
+
+Build a portable Lute Designer: a folder (and zip) that runs by opening index.html, no server or install needed.
 
 The web version is index.php, whose only PHP is including lutedesigner.html. This writes that page out as
 plain HTML next to the scripts, styles, images and three.js, so a browser can open it straight from disk.

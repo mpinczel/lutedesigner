@@ -1,5 +1,7 @@
 """Local development server for Lute Designer (no PHP needed).
 
+Part of Lute Designer, licensed GPLv3 (see LICENSE). Copyright (C) 2026 Mate Pinczel.
+
 Serves the repo over HTTP and emulates the two PHP pages:
   /fullmode.php  -> full version (index.php with $fullmode set)
   /index.php     -> limited version
